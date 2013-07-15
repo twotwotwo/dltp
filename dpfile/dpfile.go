@@ -3,23 +3,23 @@
 package dpfile
 
 import (
-  "io"
-  "os"
-  "path"
-  "bufio"
-  "bytes"
-  "runtime"
-  "fmt"
-  "strings" // working w/filenames
-  "regexp" // validating input filenames
-  "hash/crc64"
-  "github.com/twotwotwo/dltp/diff"
-  "github.com/twotwotwo/dltp/zip"
-  "github.com/twotwotwo/dltp/stream"
-  "github.com/twotwotwo/dltp/alloc"
-  sref "github.com/twotwotwo/dltp/sourceref"
-  "github.com/twotwotwo/dltp/mwxmlchunk"
-  "encoding/binary"
+	"bufio"
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"github.com/twotwotwo/dltp/alloc"
+	"github.com/twotwotwo/dltp/diff"
+	"github.com/twotwotwo/dltp/mwxmlchunk"
+	sref "github.com/twotwotwo/dltp/sourceref"
+	"github.com/twotwotwo/dltp/stream"
+	"github.com/twotwotwo/dltp/zip"
+	"hash/crc64"
+	"io"
+	"os"
+	"path"
+	"regexp" // validating input filenames
+	"runtime"
+	"strings" // working w/filenames
 )
 
 /*
@@ -36,19 +36,19 @@ The text preamble has the following lines (each ending \n):
   - a blank line
   - a list of files, starting with the output file
   - a blank line
-  
-Then they're followed by binary diffs each headed with a source reference, which 
+
+Then they're followed by binary diffs each headed with a source reference, which
 consists of three varints (written/read by SourceRef.Write and ReadSource):
-  
+
   source file number (signed; -1 means no source)
   start offset (unsigned)
   source length (unsigned)
 
-then the binary diff, which ends with a 0 instruction (see diff.Patch), 
-then the ECMA CRC-64 (the only fixed-size int in the format), then the 
+then the binary diff, which ends with a 0 instruction (see diff.Patch),
+then the ECMA CRC-64 (the only fixed-size int in the format), then the
 uncompressed length as an unsigned varint.
 
-A source info header with ID, offset, and length all 0 marks the end of the 
+A source info header with ID, offset, and length all 0 marks the end of the
 file.
 
 The methods here are:
@@ -62,10 +62,10 @@ dpr.ReadSegment()               // expand and write a page
 dpr.Close()                     // flush outfile
 
 The implementation does some gymnastics to package DiffTasks to run in the
-background and have their output written later. It's not perfect, but seems to 
+background and have their output written later. It's not perfect, but seems to
 help.
 
-There are also vestiges of support for diffing successive revs of a page 
+There are also vestiges of support for diffing successive revs of a page
 against each other (e.g., in an incremental file). This would be nice to revive
 but isn't that close now.
 
@@ -74,7 +74,7 @@ but isn't that close now.
 // 386: individual values (segment lengths) need to be <2GB because of the ints
 // here
 func writeVarint(w io.Writer, val int) {
-  var encBuf [10]byte
+	var encBuf [10]byte
 	i := binary.PutVarint(encBuf[:], int64(val))
 	_, err := w.Write(encBuf[:i])
 	if err != nil {
@@ -83,7 +83,7 @@ func writeVarint(w io.Writer, val int) {
 }
 
 func writeUvarint(w io.Writer, val int) {
-  var encBuf [10]byte
+	var encBuf [10]byte
 	i := binary.PutUvarint(encBuf[:], uint64(val))
 	_, err := w.Write(encBuf[:i])
 	if err != nil {
@@ -92,10 +92,10 @@ func writeUvarint(w io.Writer, val int) {
 }
 
 type DiffTask struct {
-    s diff.MatchState
-    source sref.SourceRef
-    resultBuf []byte
-    done chan int
+	s         diff.MatchState
+	source    sref.SourceRef
+	resultBuf []byte
+	done      chan int
 }
 
 type DPWriter struct {
@@ -116,7 +116,6 @@ type DPReader struct {
 	lastSeg []byte
 }
 
-
 var MaxSourceLength = uint64(1e8)
 
 var crcTable *crc64.Table
@@ -125,13 +124,13 @@ func NewWriter(zOut io.WriteCloser, sourceNames []string) (dpw DPWriter) {
 	for i, name := range sourceNames {
 		r, err := zip.Open(name)
 		if err != nil {
-		  panic("cannot open source: " + err.Error())
+			panic("cannot open source: " + err.Error())
 		}
 		f := stream.NewReaderAt(r)
 		dpw.sources = append(dpw.sources, mwxmlchunk.NewSegmentReader(f, int64(i)))
 	}
-  dpw.zOut = zOut
-  dpw.out = bufio.NewWriter(zOut)
+	dpw.zOut = zOut
+	dpw.out = bufio.NewWriter(zOut)
 	if crcTable == nil {
 		crcTable = crc64.MakeTable(crc64.ECMA)
 	}
@@ -140,9 +139,9 @@ func NewWriter(zOut io.WriteCloser, sourceNames []string) (dpw DPWriter) {
 		panic(err)
 	}
 	for _, name := range sourceNames {
-	  niceOutName := path.Base(name)
-	  niceOutName = strings.Replace(niceOutName, ".gz", "", 1)
-	  niceOutName = strings.Replace(niceOutName, ".bz2", "", 1)
+		niceOutName := path.Base(name)
+		niceOutName = strings.Replace(niceOutName, ".gz", "", 1)
+		niceOutName = strings.Replace(niceOutName, ".bz2", "", 1)
 		fmt.Fprintln(dpw.out, niceOutName)
 	}
 	err = dpw.out.WriteByte('\n')
@@ -150,78 +149,78 @@ func NewWriter(zOut io.WriteCloser, sourceNames []string) (dpw DPWriter) {
 		panic(err)
 	}
 	dpw.out.Flush()
-	
+
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	dpw.slots = 100 // really a queue len, not thread count
 	dpw.taskCh = make(chan *DiffTask, dpw.slots)
 	for workerNum := 0; workerNum < runtime.NumCPU(); workerNum++ {
-	    go doDiffTasks(dpw.taskCh)
+		go doDiffTasks(dpw.taskCh)
 	}
 	dpw.tasks = make([]DiffTask, dpw.slots)
 	for i := range dpw.tasks {
-	    t := &dpw.tasks[i]
-	    t.s.Out = &bytes.Buffer{}
-	    t.done = make(chan int, 1)
-	    t.done <- 1
+		t := &dpw.tasks[i]
+		t.s.Out = &bytes.Buffer{}
+		t.done = make(chan int, 1)
+		t.done <- 1
 	}
 	return
 }
 
 // a DiffTask wraps a MatchState with channel bookkeeping
 func (t *DiffTask) Diff() { // really SegmentTask but arh
-    bOrig := t.s.B // is truncated by Diff
-  	t.source.Write(t.s.Out)
-    t.s.Diff()
-  	binary.Write(t.s.Out, binary.BigEndian, crc64.Checksum(bOrig, crcTable))
-  	writeUvarint(t.s.Out, len(bOrig))
-  	select {
-    case t.done <- 1:
-      return
-    default:
-      panic("same difftask being used twice!")
-    }
+	bOrig := t.s.B // is truncated by Diff
+	t.source.Write(t.s.Out)
+	t.s.Diff()
+	binary.Write(t.s.Out, binary.BigEndian, crc64.Checksum(bOrig, crcTable))
+	writeUvarint(t.s.Out, len(bOrig))
+	select {
+	case t.done <- 1:
+		return
+	default:
+		panic("same difftask being used twice!")
+	}
 }
 
 func doDiffTasks(tc chan *DiffTask) {
-    for t := range tc {
-        t.Diff()
-    }
+	for t := range tc {
+		t.Diff()
+	}
 }
 
 func (dpw *DPWriter) WriteSegment() bool {
-  // find the matching texts
-  b := dpw.sources[0]
-  a := dpw.sources[1:]
-  source := sref.SourceNotFound
-  aText := []byte(nil)
-  bText, key, _, revFetchErr := b.ReadNext()
+	// find the matching texts
+	b := dpw.sources[0]
+	a := dpw.sources[1:]
+	source := sref.SourceNotFound
+	aText := []byte(nil)
+	bText, key, _, revFetchErr := b.ReadNext()
 	if revFetchErr != nil && revFetchErr != io.EOF {
-	  panic(revFetchErr)
+		panic(revFetchErr)
 	}
-  for _, src := range a {
-    err := error(nil)
-    aText, _, source, err = src.ReadTo(key)
-	  if err != nil && err != io.EOF {
-	    panic(err)
-	  }
-    if len(aText) > 0 {
-      break
-    }
-  }
-  // write something out
+	for _, src := range a {
+		err := error(nil)
+		aText, _, source, err = src.ReadTo(key)
+		if err != nil && err != io.EOF {
+			panic(err)
+		}
+		if len(aText) > 0 {
+			break
+		}
+	}
+	// write something out
 	if source.Length > MaxSourceLength {
 		source = sref.SourceNotFound
-	  aText = nil
+		aText = nil
 	}
 
-	t := &dpw.tasks[dpw.winner % dpw.slots]
+	t := &dpw.tasks[dpw.winner%dpw.slots]
 	<-t.done
 
 	_, err := t.s.Out.WriteTo(dpw.out)
 	if err != nil {
-	  panic("failed to write output: " + err.Error())
+		panic("failed to write output: " + err.Error())
 	}
-	
+
 	t.source = source
 	t.s.A = alloc.CopyBytes(t.s.A, aText)
 	t.s.B = alloc.CopyBytes(t.s.B, bText)
@@ -230,24 +229,24 @@ func (dpw *DPWriter) WriteSegment() bool {
 	dpw.winner++
 
 	if revFetchErr == io.EOF {
-	  return false
+		return false
 	}
 	return true
 }
 
 func (dpw *DPWriter) Close() {
-  for i := range dpw.tasks { // heh, we have to use i
-    	t := &dpw.tasks[(dpw.winner + i) % dpw.slots]
-    	<-t.done
-    	t.s.Out.WriteTo(dpw.out)
-  }
-  close(dpw.taskCh)
+	for i := range dpw.tasks { // heh, we have to use i
+		t := &dpw.tasks[(dpw.winner+i)%dpw.slots]
+		<-t.done
+		t.s.Out.WriteTo(dpw.out)
+	}
+	close(dpw.taskCh)
 	sref.EOFMarker.Write(dpw.out)
 	dpw.out.Flush()
 	if dpw.zOut != nil {
-	  dpw.zOut.Close()
-  }
-  //fmt.Println("Packed successfully")
+		dpw.zOut.Close()
+	}
+	//fmt.Println("Packed successfully")
 }
 
 func readLineOrPanic(in *bufio.Reader) string {
@@ -282,7 +281,7 @@ func panicOnUnsafeName(filename string) string {
 // these panics should probably be more informative quitWiths, or possibly
 // error returns
 func NewReader(in io.Reader, workingDir *os.File, streaming bool) (dpr DPReader) {
-  dpr.in = bufio.NewReader(in)
+	dpr.in = bufio.NewReader(in)
 
 	if crcTable == nil {
 		crcTable = crc64.MakeTable(crc64.ECMA)
@@ -291,7 +290,7 @@ func NewReader(in io.Reader, workingDir *os.File, streaming bool) (dpr DPReader)
 	formatName := readLineOrPanic(dpr.in)
 	expectedFormatName := "DeltaPacker"
 	if formatName != expectedFormatName {
-	  fmt.Println("Expected format name:", expectedFormatName)
+		fmt.Println("Expected format name:", expectedFormatName)
 		panic("Doesn't look like the right file format")
 	}
 
@@ -317,36 +316,35 @@ func NewReader(in io.Reader, workingDir *os.File, streaming bool) (dpr DPReader)
 	var outFile *os.File
 	var err error
 	if streaming {
-	  outFile = os.Stdout
+		outFile = os.Stdout
 	} else {
-	  outFile, err = os.Create(outputPath)
-	  if err != nil {
-		  panic("cannot create output")
-	  }
-  }
+		outFile, err = os.Create(outputPath)
+		if err != nil {
+			panic("cannot create output")
+		}
+	}
 	dpr.out = bufio.NewWriter(outFile)
-  // open all sources for reading, including the output
+	// open all sources for reading, including the output
 	for sourceName := outputName; sourceName != ""; sourceName = panicOnUnsafeName(readLineOrPanic(dpr.in)) {
-	  if streaming && sourceName == outputName {
-      dpr.sources = append(dpr.sources, nil) // don't read from me!
-      continue
-	  }
+		if streaming && sourceName == outputName {
+			dpr.sources = append(dpr.sources, nil) // don't read from me!
+			continue
+		}
 		sourcePath := path.Join(dirName, sourceName)
 		zipReader, err := zip.Open(sourcePath)
 		if err != nil {
-	    panic("could not open source " + sourceName + ": " + err.Error())
+			panic("could not open source " + sourceName + ": " + err.Error())
 		}
 		stream := stream.NewReaderAt(zipReader)
 		dpr.sources = append(dpr.sources, stream)
 	}
 	if len(dpr.sources) < 2 {
-	  panic("Need at least one source besides the output")
+		panic("Need at least one source besides the output")
 	}
 
 	// we've read the blank line so we're ready for business
 	return
 }
-
 
 var readBuf []byte // not parallel-safe, but reading isn't threaded
 
@@ -363,7 +361,7 @@ func (dpr *DPReader) ReadSegment() bool { // writes to self.out
 	orig := readBuf
 	// TODO: validate source number, start, length validity here
 	if source == sref.PreviousSegment {
-	  panic("segment chaining not implemented")
+		panic("segment chaining not implemented")
 	} else if source != sref.SourceNotFound {
 		if int(source.SourceNumber) >= len(dpr.sources) {
 			panic("too-high source number provided")
@@ -403,5 +401,3 @@ func (dpr *DPReader) ReadSegment() bool { // writes to self.out
 func (dpr *DPReader) Close() {
 	dpr.out.Flush()
 }
-
-

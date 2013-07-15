@@ -3,13 +3,13 @@
 package sourceref
 
 import (
-    "io"
-    "encoding/binary"
+	"encoding/binary"
+	"io"
 )
 
 /*
 
-Types for exchanging info about source references, for use by 
+Types for exchanging info about source references, for use by
 github.com/twotwotwo/dltp/mwxmlchunk and diffpack/dpfile.
 
 It's not super clear this *couldn't* be part of github.com/twotwotwo/dltp/mwxmlchunk instead. But
@@ -29,7 +29,7 @@ var PreviousSegment = SourceRef{-2, 0, 0}
 var EOFMarker = SourceRef{0, 0, 0}
 
 func (s SourceRef) Write(w io.Writer) {
-  var encodingBuf [32]byte
+	var encodingBuf [32]byte
 	encodedSource := encodingBuf[:]
 	// negative source numbers are special values
 	i := binary.PutVarint(encodedSource, s.SourceNumber)
@@ -37,7 +37,7 @@ func (s SourceRef) Write(w io.Writer) {
 	i += binary.PutUvarint(encodedSource[i:], s.Length)
 	_, err := w.Write(encodingBuf[:i])
 	if err != nil {
-	  //fmt.Fprintln(os.Stderr, err)
+		//fmt.Fprintln(os.Stderr, err)
 		panic("couldn't write source information")
 	}
 }
@@ -57,5 +57,3 @@ func ReadSource(r io.ByteReader) SourceRef {
 	}
 	return SourceRef{int64(sourceNumber), uint64(start), uint64(length)}
 }
-
-

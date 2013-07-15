@@ -3,9 +3,9 @@
 package scan
 
 import (
-    "bytes"
-    "github.com/twotwotwo/dltp/alloc"
-    "io"
+	"bytes"
+	"github.com/twotwotwo/dltp/alloc"
+	"io"
 )
 
 /*
@@ -28,7 +28,7 @@ type Scanner struct {
 	backing []byte
 }
 
-// fill s.All with more data--return bytes read in, or -1 if no data was 
+// fill s.All with more data--return bytes read in, or -1 if no data was
 // available. may expand the buffer or move data around in it.
 func (s *Scanner) fill() int64 {
 	if len(s.All) == cap(s.All) {
@@ -60,26 +60,26 @@ func (s *Scanner) consume(length int) { // 386: segments need to be <2GB (OK)
 // discard
 func (s *Scanner) Discard() {
 	length := len(s.unread)
-	if cap(s.All) < cap(s.backing) / 2 {
-    	copy(s.backing[:length], s.unread)
-    	s.All = s.backing[:length]
+	if cap(s.All) < cap(s.backing)/2 {
+		copy(s.backing[:length], s.unread)
+		s.All = s.backing[:length]
 	} else { // avoid copy
-	    s.All = s.All[s.unreadOffs - s.Offs:]
+		s.All = s.All[s.unreadOffs-s.Offs:]
 	}
-  s.Offs = s.unreadOffs
-  s.All = s.All[:length]
-  s.unread = s.All
+	s.Offs = s.unreadOffs
+	s.All = s.All[:length]
+	s.unread = s.All
 }
 
 func (s *Scanner) ScanTo(a []byte, inclusive bool, discard bool) int64 {
 	i := bytes.Index(s.unread, a)
 	for i == -1 {
-	  if len(s.unread) > (len(a) - 1) {
-		  s.consume(len(s.unread) - (len(a) - 1))
-		  if discard {
-			  s.Discard()
-		  }
-	  }
+		if len(s.unread) > (len(a) - 1) {
+			s.consume(len(s.unread) - (len(a) - 1))
+			if discard {
+				s.Discard()
+			}
+		}
 		c := s.fill()
 		if c == -1 {
 			// consume everything
@@ -98,40 +98,40 @@ func (s *Scanner) ScanTo(a []byte, inclusive bool, discard bool) int64 {
 	return s.unreadOffs
 }
 
-// consume bytes, respecting a limit, 
+// consume bytes, respecting a limit,
 func (s *Scanner) consumeLimited(bytes int, limit int) (consumed int) {
-    if bytes < limit {
-        s.consume(bytes)
-        return bytes
-    } else {
-        s.consume(limit)
-        return limit
-    }
+	if bytes < limit {
+		s.consume(bytes)
+		return bytes
+	} else {
+		s.consume(limit)
+		return limit
+	}
 }
 
 // scan for a string, but don't consume more than a certain amount. handy
 // for splitting big revision histories into chunks we can handle.
 //
-// if it's more convenient at the higher levels, 'found' could become 
+// if it's more convenient at the higher levels, 'found' could become
 // 'notLimited' and be true at EOF
 func (s *Scanner) LimitedScan(a []byte, maxDistance int, inclusive bool) (off int64, found bool) {
 	remainingDistance := maxDistance
 	i := bytes.Index(s.unread, a)
 	for i == -1 {
-	  if len(s.unread) > (len(a) - 1) {
-  	  // eat what we scanned (leaving a bit in case substring straddles a chunk
-  	  // boundary), and bail w/failure if we've read our limit
-		  remainingDistance -= 
-		      s.consumeLimited(len(s.unread) - (len(a) - 1), remainingDistance)
-      if remainingDistance <= 0 {
-          return s.unreadOffs, false
-      }
-	  }
+		if len(s.unread) > (len(a) - 1) {
+			// eat what we scanned (leaving a bit in case substring straddles a chunk
+			// boundary), and bail w/failure if we've read our limit
+			remainingDistance -=
+				s.consumeLimited(len(s.unread)-(len(a)-1), remainingDistance)
+			if remainingDistance <= 0 {
+				return s.unreadOffs, false
+			}
+		}
 		c := s.fill()
 		if c == -1 {
 			// eat the last bytes, and bail w/-1 and failure
 			remainingDistance -=
-			    s.consumeLimited(len(s.unread), remainingDistance)
+				s.consumeLimited(len(s.unread), remainingDistance)
 			return c, false
 		}
 		i = bytes.Index(s.unread, a)
@@ -140,12 +140,12 @@ func (s *Scanner) LimitedScan(a []byte, maxDistance int, inclusive bool) (off in
 		i += len(a)
 	}
 	remainingDistance -=
-	    s.consumeLimited(i, remainingDistance)
-  if remainingDistance < 0 { // == 0 means it was right at end of allowed span
-      return s.unreadOffs, false
-  } else {
-      return s.unreadOffs, true
-  }
+		s.consumeLimited(i, remainingDistance)
+	if remainingDistance < 0 { // == 0 means it was right at end of allowed span
+		return s.unreadOffs, false
+	} else {
+		return s.unreadOffs, true
+	}
 }
 
 func (s *Scanner) ReadBytes(a []byte) (res []byte) {
@@ -161,7 +161,7 @@ func (s *Scanner) ReadString() (res string) {
 }
 
 // reads an unsigned int into a signed int type; -1 if there's no int there
-// consumes nothing (hence Peek), and may read data 
+// consumes nothing (hence Peek), and may read data
 func (s *Scanner) PeekInt() (parsed int) {
 	// ensure the longest int we can expect fits in buffer
 	if len(s.unread) < 21 {
@@ -170,20 +170,20 @@ func (s *Scanner) PeekInt() (parsed int) {
 
 		// corner case: there was space in s.All, but not enough for our int
 		if i != -1 && cap(s.unread) < 21 {
-		  
-		  i = s.fill() // a second fill() should double the size of s.All
-		  
-		  // *real* corner case: we started with too small an s.All
-		  if i != -1 && cap(s.unread) < 21 {
-		    panic("initial read buffer needs to be a reasonable size (say, 10kb)")
-		  }
+
+			i = s.fill() // a second fill() should double the size of s.All
+
+			// *real* corner case: we started with too small an s.All
+			if i != -1 && cap(s.unread) < 21 {
+				panic("initial read buffer needs to be a reasonable size (say, 10kb)")
+			}
 
 		}
-		
+
 	}
 	// cheap atoi; doesn't recognize too-large ints, floats, 1e6, and so on
 	if len(s.unread) == 0 {
-    return -1
+		return -1
 	}
 	for i, c := range s.unread {
 		if c < byte('0') || c > byte('9') || i == 21 {
@@ -201,16 +201,15 @@ func (s *Scanner) PeekInt() (parsed int) {
 func NewScanner(r io.Reader, cap int) (s *Scanner) {
 	buf := make([]byte, 0, cap)
 	s = &Scanner{
-		in:     r,
-		All:    buf,
+		in:      r,
+		All:     buf,
 		backing: buf,
-		unread: buf,
+		unread:  buf,
 	}
 	s.fill()
 	return
 }
 
 func (s *Scanner) Content() []byte {
-  return s.All[:s.unreadOffs-s.Offs] // then caller should usually Discard
+	return s.All[:s.unreadOffs-s.Offs] // then caller should usually Discard
 }
-
