@@ -54,7 +54,7 @@ file.
 The methods here are:
 
 NewWriter(out, sources)         // write magic and filenames (incl input)
-dpw.WriteSegment(source, text)  // write source number, start, end, diff, CRC
+dpw.WriteSegment()              // write source number, start, end, diff, CRC
 dpw.Close()                     // write end marker
 
 NewReader(in, sources)          // open (including opening output)
@@ -120,14 +120,21 @@ var MaxSourceLength = uint64(1e8)
 
 var crcTable *crc64.Table
 
-func NewWriter(zOut io.WriteCloser, sourceNames []string) (dpw DPWriter) {
+func NewWriter(zOut io.WriteCloser, sourceNames []string, lastRevOnly bool, limitToNS bool, ns int, cutMeta bool) (dpw DPWriter) {
 	for i, name := range sourceNames {
 		r, err := zip.Open(name)
 		if err != nil {
 			panic("cannot open source: " + err.Error())
 		}
 		f := stream.NewReaderAt(r)
-		dpw.sources = append(dpw.sources, mwxmlchunk.NewSegmentReader(f, int64(i)))
+		dpw.sources = append(
+			dpw.sources,
+			mwxmlchunk.NewSegmentReader(f, int64(i), lastRevOnly, limitToNS, ns, cutMeta),
+		)
+		// only use snipping options when reading first source
+		lastRevOnly = false
+		limitToNS = false
+		cutMeta = false
 	}
 	dpw.zOut = zOut
 	dpw.out = bufio.NewWriter(zOut)
@@ -170,9 +177,9 @@ func NewWriter(zOut io.WriteCloser, sourceNames []string) (dpw DPWriter) {
 func (t *DiffTask) Diff() { // really SegmentTask but arh
 	bOrig := t.s.B // is truncated by Diff
 	t.source.Write(t.s.Out)
+	binary.Write(t.s.Out, binary.BigEndian, crc64.Checksum(t.s.A, crcTable))
 	t.s.Diff()
 	binary.Write(t.s.Out, binary.BigEndian, crc64.Checksum(bOrig, crcTable))
-	writeUvarint(t.s.Out, len(bOrig))
 	select {
 	case t.done <- 1:
 		return
@@ -222,8 +229,8 @@ func (dpw *DPWriter) WriteSegment() bool {
 	}
 
 	t.source = source
-	t.s.A = alloc.CopyBytes(t.s.A, aText)
-	t.s.B = alloc.CopyBytes(t.s.B, bText)
+	t.s.A = append(t.s.A[:0], aText...)
+	t.s.B = append(t.s.B[:0], bText...)
 	t.s.Out.Reset()
 	dpw.taskCh <- t
 	dpw.winner++
@@ -357,6 +364,7 @@ func (dpr *DPReader) ReadSegment() bool { // writes to self.out
 		//fmt.Println("Max source len set to", MaxSourceLength)
 		panic("input file (segment) using too large a source")
 	}
+
 	readBuf = alloc.Bytes(readBuf, int(source.Length))
 	orig := readBuf
 	// TODO: validate source number, start, length validity here
@@ -373,28 +381,35 @@ func (dpr *DPReader) ReadSegment() bool { // writes to self.out
 			panic(err)
 		}
 	}
-	text := diff.Patch(orig, dpr.in)
-	dpr.lastSeg = text
-	_, err := dpr.out.Write(text)
+
+	var sourceCrc uint64
+	err := binary.Read(dpr.in, binary.BigEndian, &sourceCrc)
 	if err != nil {
-		panic("couldn't write expanded file")
+		panic("couldn't read expected CRC")
 	}
-	crc := crc64.Checksum(text, crcTable)
+	crc := crc64.Checksum(orig, crcTable)
+	if crc != sourceCrc {
+		panic("CRC mismatch in source--wrong/modified source file?")
+	}
+
+	text := diff.Patch(orig, dpr.in)
+
+	crc = crc64.Checksum(text, crcTable)
 	var fileCrc uint64
 	err = binary.Read(dpr.in, binary.BigEndian, &fileCrc)
 	if err != nil {
 		panic("couldn't read expected CRC")
 	}
 	if crc != fileCrc {
-		panic("CRC mismatch")
+		panic("CRC mismatch in output")
 	}
-	length, err := binary.ReadUvarint(dpr.in)
+
+	dpr.lastSeg = text
+	_, err = dpr.out.Write(text)
 	if err != nil {
-		panic("couldn't read uncompressed len")
+		panic("couldn't write expanded file")
 	}
-	if int(length) != len(text) { // 386: segments limited to 2GB (OK)
-		panic("incorrect uncompressed length")
-	}
+
 	return true
 }
 

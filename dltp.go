@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"runtime/pprof"
+	"strconv"
 	"strings"
 
 	"github.com/twotwotwo/dltp/dpfile"
@@ -64,7 +65,7 @@ func WriteDiffPack(out io.WriteCloser, inNames []string) {
 		}
 	}
 	// newwriter
-	w := dpfile.NewWriter(out, inNames)
+	w := dpfile.NewWriter(out, inNames, *lastRev, limitToNS, ns, *cutMeta)
 	for w.WriteSegment() {
 	}
 	w.Close()
@@ -129,6 +130,12 @@ var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 var memprofile = flag.String("memprofile", "", "write mem profile to file")
 var useStdout = flag.Bool("c", false, "write to stdout even if unpacking file")
 var useFile = flag.Bool("f", false, "write to file even if unpacking stdin")
+var lastRev = flag.Bool("lastrev", false, "remove all but last rev in incr XML")
+var nsString = flag.String("ns", "", "limit to pages in given <ns>")
+var cutMeta = flag.Bool("cutmeta", false, "cut <contributor>/<comment>/<minor>")
+
+var limitToNS = false
+var ns = 0
 
 var bz2 = flag.Bool("j", false, "try to use bzip")
 var gz = flag.Bool("z", false, "try to use gzip")
@@ -144,34 +151,54 @@ func main() {
 	flag.Parse()
 	args := flag.Args()
 
-	compressOpts := 0
-	if *bz2 && !zip.CanWrite("bz2") {
-		quitWith("can't write .bz2 on this system")
-		compressOpts++
-	}
-	if *gz && !zip.CanWrite("gz") {
-		quitWith("can't write .gz on this system")
-		compressOpts++
-	}
-	if *xz && !zip.CanWrite("xz") {
-		quitWith("can't write .xz on this system")
-		compressOpts++
-	}
-	if *raw {
-		compressOpts++
-	}
-	if compressOpts > 1 {
-		quitWith("you can only choose one compression option (-j/-z/-x/-r)")
-	}
-	if (*bz2 || *gz || *xz || *raw) && len(args) < 2 {
-		quitWith("compression options only work when packing")
-	}
-	// supporting - as source filename will obsolete these
-	if *useFile && len(args) >= 2 {
-		quitWith("for now, -f only necessary when unpacking from stdin")
-	}
-	if *useFile && *useStdout {
-		quitWith("can't write both to stdin and to file")
+	if len(args) < 2 { // validate other args as if unpacking
+		if *bz2 || *gz || *xz || *raw {
+			quitWith("compression options only work when packing")
+		}
+		if *useFile && *useStdout {
+			quitWith("can't write both to stdin and to file")
+		}
+		if *lastRev {
+			quitWith("-lastrev only used when packing")
+		}
+		if *nsString != "" {
+			quitWith("-ns only used when packing")
+		}
+	} else { // validate as if packing
+		compressOpts := 0
+		if *bz2 {
+			if !zip.CanWrite("bz2") {
+				quitWith("can't write .bz2 on this system")
+			}
+			compressOpts++
+		}
+		if *gz {
+			compressOpts++
+		}
+		if *xz {
+			if !zip.CanWrite("xz") {
+				quitWith("can't write .xz on this system")
+			}
+			compressOpts++
+		}
+		if *raw {
+			compressOpts++
+		}
+		if compressOpts > 1 {
+			quitWith("you can only choose one compression option (-j/-z/-x/-r)")
+		}
+		if *useFile {
+			quitWith("for now, -f is redundant when packing")
+		}
+
+		if *nsString != "" {
+			limitToNS = true
+			var err error
+			ns, err = strconv.Atoi(*nsString)
+			if err != nil {
+				quitWith("ns must be an integer")
+			}
+		}
 	}
 
 	// with help from http://blog.golang.org/profiling-go-programs

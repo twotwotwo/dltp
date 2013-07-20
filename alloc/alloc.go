@@ -15,8 +15,3 @@ func Bytes(buf []byte, size int) []byte {
 	}
 	return buf[:size]
 }
-
-func CopyBytes(dst []byte, src []byte) []byte {
-	dst = Bytes(dst, len(src))
-	return dst[:copy(dst, src)]
-}

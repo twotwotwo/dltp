@@ -4,7 +4,6 @@ package scan
 
 import (
 	"bytes"
-	"github.com/twotwotwo/dltp/alloc"
 	"io"
 )
 
@@ -98,6 +97,67 @@ func (s *Scanner) ScanTo(a []byte, inclusive bool, discard bool) int64 {
 	return s.unreadOffs
 }
 
+// look for whichever of a set of sequences comes up first in the stream.
+// we depend on this returning the same byte slice passed in.
+func (s *Scanner) ScanToAny(aChoices [][]byte, inclusive bool, discard bool) (int64, []byte) {
+	i := -1
+	a := []byte(nil)
+	overlap := 0
+
+	for {
+		// look for the sequence that appears first in the buffer
+		for _, myA := range aChoices {
+			myI := bytes.Index(s.unread, myA)
+			// not the most elegant if cond
+			if myI != -1 && (i == -1 || myI < i) {
+				i = myI
+				a = myA
+			}
+		}
+		// if found, return where we ended up
+		if i != -1 {
+			if inclusive {
+				i += len(a)
+			}
+			s.consume(i)
+			return s.unreadOffs, a
+		}
+
+		// determine how much overlap to keep, then fill buffer
+		if overlap == 0 {
+			for _, myA := range aChoices {
+				if len(myA)-1 > overlap {
+					overlap = len(myA) - 1
+				}
+			}
+		}
+		if len(s.unread) > overlap {
+			s.consume(len(s.unread) - overlap)
+			if discard {
+				s.Discard()
+			}
+		}
+		c := s.fill()
+
+		// bail out if there is no more data to read
+		if c == -1 {
+			// consume everything
+			s.consume(len(s.unread))
+			if discard {
+				s.Discard()
+			}
+			return c, nil
+		}
+
+	}
+}
+
+/*
+ * consumeLimited and LimitedScan are for a so-far-hypothetical mode where we
+ * compress an *entire* revision history but break it into largish chunks (say,
+ * 10MB at a go) to save memory. tl;dr: not used.
+ */
+
 // consume bytes, respecting a limit,
 func (s *Scanner) consumeLimited(bytes int, limit int) (consumed int) {
 	if bytes < limit {
@@ -149,7 +209,7 @@ func (s *Scanner) LimitedScan(a []byte, maxDistance int, inclusive bool) (off in
 }
 
 func (s *Scanner) ReadBytes(a []byte) (res []byte) {
-	res = alloc.CopyBytes(a, s.All[:s.unreadOffs-s.Offs])
+	res = append(a[:0], s.All[:s.unreadOffs-s.Offs]...)
 	s.Discard()
 	return
 }

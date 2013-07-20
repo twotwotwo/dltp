@@ -26,11 +26,15 @@ type SourceRef struct {
 
 var SourceNotFound = SourceRef{-1, 0, 0}
 var PreviousSegment = SourceRef{-2, 0, 0}
+var InvalidSource = SourceRef{-3, 0, 0}
 var EOFMarker = SourceRef{0, 0, 0}
 
 func (s SourceRef) Write(w io.Writer) {
 	var encodingBuf [32]byte
 	encodedSource := encodingBuf[:]
+	if s == InvalidSource {
+		panic("tried to write InvalidSource")
+	}
 	// negative source numbers are special values
 	i := binary.PutVarint(encodedSource, s.SourceNumber)
 	i += binary.PutUvarint(encodedSource[i:], s.Start)
