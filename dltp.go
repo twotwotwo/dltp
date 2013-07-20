@@ -15,6 +15,9 @@ import (
 
 	"github.com/twotwotwo/dltp/dpfile"
 	"github.com/twotwotwo/dltp/zip"
+
+	// for -cut mode
+	chunk "github.com/twotwotwo/dltp/mwxmlchunk"
 )
 
 /* WRAPPERS */
@@ -124,6 +127,23 @@ func ReadDiffPack(dp *os.File) {
 	r.Close()
 }
 
+func CutStdinToStdout() {
+	r := chunk.NewSegmentReader(os.Stdin, 0, *lastRev, limitToNS, ns, *cutMeta)
+	for {
+		text, _, _, err := r.ReadNext()
+		if err != nil {
+			if err != io.EOF {
+				panic(err)
+			}
+			break
+		}
+		_, err = os.Stdout.Write(text)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
 /* COMMAND-LINE HANDLING */
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
@@ -133,6 +153,7 @@ var useFile = flag.Bool("f", false, "write to file even if unpacking stdin")
 var lastRev = flag.Bool("lastrev", false, "remove all but last rev in incr XML")
 var nsString = flag.String("ns", "", "limit to pages in given <ns>")
 var cutMeta = flag.Bool("cutmeta", false, "cut <contributor>/<comment>/<minor>")
+var cut = flag.Bool("cut", false, "just output a cut down stdin (don't pack)")
 
 var limitToNS = false
 var ns = 0
@@ -151,7 +172,17 @@ func main() {
 	flag.Parse()
 	args := flag.Args()
 
-	if len(args) < 2 { // validate other args as if unpacking
+	if *cut {
+		if *bz2 || *gz || *xz || *raw || *useStdout || *useFile {
+			quitWith("only -lastrev, -ns, and -cutmeta work with -cut")
+		}
+		if !(*lastRev || *cutMeta || *nsString != "") {
+			quitWith("use some of -lastrev, -ns, and -cutmeta with -cut")
+		}
+		if len(args) > 0 {
+			quitWith("-cut only streams from stdin to stdout")
+		}
+	} else if len(args) < 2 { // validate other args as if unpacking
 		if *bz2 || *gz || *xz || *raw {
 			quitWith("compression options only work when packing")
 		}
@@ -221,7 +252,9 @@ func main() {
 	}
 
 	filenames := args[:]
-	if len(filenames) < 2 { //expand
+	if *cut {
+		CutStdinToStdout()
+	} else if len(filenames) < 2 { //expand
 		var dp *os.File
 		var err error
 		if len(filenames) == 1 {

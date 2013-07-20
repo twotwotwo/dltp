@@ -3,8 +3,9 @@
 package zip
 
 import (
-	"compress/bzip2" // ditto but uncompress only
-	"compress/gzip"  // fallback f/no pipeable gzip present (e.g., Windows)
+	"compress/bzip2"                   // ditto but uncompress only
+	"compress/gzip"                    // fallback f/no pipeable gzip present (e.g., Windows)
+	"github.com/twotwotwo/dltp/stream" // allow skipping fwd through streams
 	"io"
 	"os"
 	"os/exec"
@@ -25,7 +26,7 @@ or use go's own gzip
 
 */
 
-func Open(path string) (reader io.Reader, err error) {
+func Open(path string) (s stream.Stream, err error) {
 	suffixes := []string{"", ".gz", ".bz2", ".xz"}
 	var file *os.File
 	for _, suffix := range suffixes {
@@ -36,12 +37,13 @@ func Open(path string) (reader io.Reader, err error) {
 			}
 			return nil, err
 		}
-		reader = file
 		break
 	}
 	if file == nil {
 		return nil, os.ErrNotExist
 	}
+
+	var reader io.Reader
 
 	if strings.HasSuffix(file.Name(), ".gz") {
 		reader, err = NewReader(file, "gz")
@@ -60,6 +62,12 @@ func Open(path string) (reader io.Reader, err error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if reader == nil {
+		return file, nil
+	} else {
+		return stream.NewReaderAt(reader), nil
 	}
 
 	return

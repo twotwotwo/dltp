@@ -342,8 +342,7 @@ func NewReader(in io.Reader, workingDir *os.File, streaming bool) (dpr DPReader)
 		if err != nil {
 			panic("could not open source " + sourceName + ": " + err.Error())
 		}
-		stream := stream.NewReaderAt(zipReader)
-		dpr.sources = append(dpr.sources, stream)
+		dpr.sources = append(dpr.sources, zipReader)
 	}
 	if len(dpr.sources) < 2 {
 		panic("Need at least one source besides the output")
