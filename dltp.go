@@ -144,6 +144,50 @@ func CutStdinToStdout() {
 	}
 }
 
+func Merge(in []io.Reader, out io.Writer) {
+	readers := make([]*chunk.SegmentReader, len(in))
+	for i, f := range in {
+		readers[i] = chunk.NewSegmentReader(f, int64(i), *lastRev, limitToNS, ns, *cutMeta)
+	}
+	lastKey := chunk.BeforeStart
+	keys := make([]chunk.SegmentKey, len(in))
+	for i, _ := range keys {
+		keys[i] = lastKey
+	}
+	text := make([][]byte, len(in))
+	for lastKey != chunk.PastEndKey {
+		// advance each past lastKey
+		for i, r := range readers {
+			for keys[i] <= lastKey {
+				txt, key, _, err := r.ReadNext()
+				text[i], keys[i] = txt, key
+				if err != nil {
+					if err != io.EOF {
+						panic(err)
+					}
+				}
+			}
+		}
+		// look for lowest value
+		lastKey = chunk.PastEndKey
+		for _, key := range keys {
+			if key < lastKey {
+				lastKey = key
+			}
+		}
+		// print the text for leftmost instance of it
+		for i, key := range keys {
+			if key == lastKey {
+				_, err := out.Write(text[i])
+				if err != nil {
+					panic(err)
+				}
+				break
+			}
+		}
+	}
+}
+
 /* COMMAND-LINE HANDLING */
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
@@ -154,6 +198,7 @@ var lastRev = flag.Bool("lastrev", false, "remove all but last rev in incr XML")
 var nsString = flag.String("ns", "", "limit to pages in given <ns>")
 var cutMeta = flag.Bool("cutmeta", false, "cut <contributor>/<comment>/<minor>")
 var cut = flag.Bool("cut", false, "just output a cut down stdin (don't pack)")
+var merge = flag.Bool("merge", false, "merge files listed on command line (newest first) to stdout")
 
 var limitToNS = false
 var ns = 0
@@ -172,9 +217,16 @@ func main() {
 	flag.Parse()
 	args := flag.Args()
 
-	if *cut {
+	if *merge {
+		if *bz2 || *gz || *xz || *raw || *useStdout || *useFile {
+			quitWith("only -lastrev, -ns, and -cutmeta work with -merge")
+		}
+	} else if *cut {
 		if *bz2 || *gz || *xz || *raw || *useStdout || *useFile {
 			quitWith("only -lastrev, -ns, and -cutmeta work with -cut")
+		}
+		if *merge {
+			quitWith("leave out -cut when using -merge")
 		}
 		if !(*lastRev || *cutMeta || *nsString != "") {
 			quitWith("use some of -lastrev, -ns, and -cutmeta with -cut")
@@ -254,13 +306,23 @@ func main() {
 	filenames := args[:]
 	if *cut {
 		CutStdinToStdout()
+	} else if *merge {
+		var sources = make([]io.Reader, len(filenames))
+		for i, fn := range filenames {
+			f, err := zip.Open(fn)
+			if err != nil {
+				quitWith("can't open source " + fn + ": " + err.Error())
+			}
+			sources[i] = f
+		}
+		Merge(sources, os.Stdout)
 	} else if len(filenames) < 2 { //expand
 		var dp *os.File
 		var err error
 		if len(filenames) == 1 {
 			dp, err = os.Open(filenames[0])
 			if err != nil {
-				panic(err)
+				quitWith("can't open source " + filenames[0] + ": " + err.Error())
 			}
 		} else {
 			dp = os.Stdin
