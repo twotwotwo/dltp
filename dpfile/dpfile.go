@@ -13,7 +13,7 @@ import (
 	sref "github.com/twotwotwo/dltp/sourceref"
 	"github.com/twotwotwo/dltp/stream"
 	"github.com/twotwotwo/dltp/zip"
-	"hash/crc64"
+	"hash/fnv"
 	"io"
 	"os"
 	"path"
@@ -45,7 +45,7 @@ consists of three varints (written/read by SourceRef.Write and ReadSource):
   source length (unsigned)
 
 then the binary diff, which ends with a 0 instruction (see diff.Patch),
-then the ECMA CRC-64 (the only fixed-size int in the format), then the
+then the 32-bit FNV-1a (the only fixed-size int in the format), then the
 uncompressed length as an unsigned varint.
 
 A source info header with ID, offset, and length all 0 marks the end of the
@@ -54,7 +54,7 @@ file.
 The methods here are:
 
 NewWriter(out, sources)         // write magic and filenames (incl input)
-dpw.WriteSegment()              // write source number, start, end, diff, CRC
+dpw.WriteSegment()              // write source number, start, end, diff, cksum
 dpw.Close()                     // write end marker
 
 NewReader(in, sources)          // open (including opening output)
@@ -91,6 +91,13 @@ func writeUvarint(w io.Writer, val int) {
 	}
 }
 
+type checksum uint32
+func dpchecksum(text []byte) checksum {
+  h := fnv.New32a()
+  h.Write(text)
+  return checksum(h.Sum32())
+}
+
 type DiffTask struct {
 	s         diff.MatchState
 	source    sref.SourceRef
@@ -118,8 +125,6 @@ type DPReader struct {
 
 var MaxSourceLength = uint64(1e8)
 
-var crcTable *crc64.Table
-
 func NewWriter(zOut io.WriteCloser, sourceNames []string, lastRevOnly bool, limitToNS bool, ns int, cutMeta bool) (dpw DPWriter) {
 	for i, name := range sourceNames {
 		r, err := zip.Open(name)
@@ -138,9 +143,6 @@ func NewWriter(zOut io.WriteCloser, sourceNames []string, lastRevOnly bool, limi
 	}
 	dpw.zOut = zOut
 	dpw.out = bufio.NewWriter(zOut)
-	if crcTable == nil {
-		crcTable = crc64.MakeTable(crc64.ECMA)
-	}
 	_, err := dpw.out.WriteString("DeltaPacker\nno format URL yet\nno source URL\n\n")
 	if err != nil {
 		panic(err)
@@ -177,9 +179,9 @@ func NewWriter(zOut io.WriteCloser, sourceNames []string, lastRevOnly bool, limi
 func (t *DiffTask) Diff() { // really SegmentTask but arh
 	bOrig := t.s.B // is truncated by Diff
 	t.source.Write(t.s.Out)
-	binary.Write(t.s.Out, binary.BigEndian, crc64.Checksum(t.s.A, crcTable))
+	binary.Write(t.s.Out, binary.BigEndian, dpchecksum(t.s.A))
 	t.s.Diff()
-	binary.Write(t.s.Out, binary.BigEndian, crc64.Checksum(bOrig, crcTable))
+	binary.Write(t.s.Out, binary.BigEndian, dpchecksum(bOrig))
 	select {
 	case t.done <- 1:
 		return
@@ -290,10 +292,6 @@ func panicOnUnsafeName(filename string) string {
 func NewReader(in io.Reader, workingDir *os.File, streaming bool) (dpr DPReader) {
 	dpr.in = bufio.NewReader(in)
 
-	if crcTable == nil {
-		crcTable = crc64.MakeTable(crc64.ECMA)
-	}
-
 	formatName := readLineOrPanic(dpr.in)
 	expectedFormatName := "DeltaPacker"
 	if formatName != expectedFormatName {
@@ -381,26 +379,26 @@ func (dpr *DPReader) ReadSegment() bool { // writes to self.out
 		}
 	}
 
-	var sourceCrc uint64
-	err := binary.Read(dpr.in, binary.BigEndian, &sourceCrc)
+	var sourceCksum checksum
+	err := binary.Read(dpr.in, binary.BigEndian, &sourceCksum)
 	if err != nil {
-		panic("couldn't read expected CRC")
+		panic("couldn't read expected checksum")
 	}
-	crc := crc64.Checksum(orig, crcTable)
-	if crc != sourceCrc {
-		panic("CRC mismatch in source--wrong/modified source file?")
+	cksum := dpchecksum(orig)
+	if cksum != sourceCksum {
+		panic("checksum mismatch in source--wrong/modified source file?")
 	}
 
 	text := diff.Patch(orig, dpr.in)
 
-	crc = crc64.Checksum(text, crcTable)
-	var fileCrc uint64
-	err = binary.Read(dpr.in, binary.BigEndian, &fileCrc)
+	cksum = dpchecksum(text)
+	var fileCksum checksum
+	err = binary.Read(dpr.in, binary.BigEndian, &fileCksum)
 	if err != nil {
-		panic("couldn't read expected CRC")
+		panic("couldn't read expected checksum")
 	}
-	if crc != fileCrc {
-		panic("CRC mismatch in output")
+	if cksum != fileCksum {
+		panic("checksum mismatch in output")
 	}
 
 	dpr.lastSeg = text

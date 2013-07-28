@@ -8,7 +8,6 @@ import (
 	"encoding/binary"
 	"github.com/twotwotwo/dltp/alloc"
 	"io"
-	"math/rand"
 )
 
 /*
@@ -46,21 +45,32 @@ usage, roughly:
   s.Diff()
   s.Out.WriteTo(os.Stdout)
 
-other fields of matchState store stuff like the hash table (h), the minimum
-value in it (base), the "current position" in a during the match (cursor),
-and a mask (hMask) indicating which bits of the rolling hash have to be 1 for
-the offset to be put in the hashtable.
+other fields of matchState store stuff like the hash table (h), the value in it
+corresponding to the start of a (base), the "current position" in a during the 
+match (cursor), and a mask (hMask) indicating which bits of the rolling hash 
+have to be 1 for the offset to be put in the hashtable (a trick stolen from 
+rzip).
 
-the rolling hash is simple (XOR in an entry from a list of 256), and a lot like
-rzip's. the hash table has 64K entries after some basic testing.
+the matching itself isn't as clever as other diff engines, and you probably pay
+in diff size. it uses a fixed hashtable size of 128k entries and doesn't 
+consider multiple match possibilities at an offset.
 
 MatchStates can be reused to save allocations.
 
-also, maybe more important, wouldn't be that crazy to scrap the whole thing for
-Git's code or the like
+iterating on this is probably not the best way to better the product. that said,
+possibilities include
+
+  - stone cold dropping this for xdelta3, open-vcdiff, or git's differ
+  - teaching it not to hash the long matches at input start and end
+  - separating binary instructions from text data for compression, like rzip
+  - squeezing out longer, or more, matches
+    - hash buckets/try multiple options like others
+    - look for short matches in between the long ones
+    - let a match completely "eat" previous match(es)
 
 */
 
+type hKey uint32
 type hVal uint32
 
 var hMax hVal = 0xFFFFFFFF
@@ -70,8 +80,8 @@ type MatchState struct {
 	B      []byte
 	h      []hVal
 	base   hVal
-	hMask  uint64
-	hBits  uint64
+	hMask  hKey
+	hBits  hKey
 	cursor int
 	Out    *bytes.Buffer
 	active bool // dumb race-condition detection
@@ -121,32 +131,31 @@ func (s *MatchState) putEnd() {
 	}
 }
 
-func makeBuzTbl() []uint64 {
-	buzTbl := make([]uint64, 256)
-	for i := 0; i < 256; i++ {
-		buzTbl[i] = uint64(rand.Int63()) // sigh
-		// put something in the top bit
-		buzTbl[i] ^= buzTbl[i] << 4
-	}
-	return buzTbl
+var hashSz = 1<<17
+var hMinMatch = 24
+
+func hKeyPow(vIn hKey, p int) (v hKey) {
+  v = vIn
+  for i := 1; i < p; i++ {
+    v *= vIn
+  }
+  return
 }
 
-var buzTbl []uint64 = makeBuzTbl()
-
-var hashSz = 131072
-var hMinMatch = 8
+var hStepFactor = hKey(16777619) // FNV's
+var hSubFactor = hKeyPow(hStepFactor, hMinMatch)
 
 // return a mask for filtering out a portion of hashes
-func hashMask(sz int, hSz int) uint64 {
+func hashMask(hSz int, sz int) hKey {
 	// bytes per table entry
-	ratio := sz / hashSz
+	ratio := float32(sz) / float32(hashSz)
 	r := uint64(ratio * 2) // let's 1/2 fill the hash table
 	i := 0
 	for r > 0 {
 		r >>= 1
 		i++
 	}
-	return (uint64(1<<uint(i)) - 1) << uint(64-i)
+	return (hKey(1<<uint(i)) - 1) << uint(32-i)
 }
 
 func (s *MatchState) hash(a []byte, offs hVal) {
@@ -170,20 +179,24 @@ func (s *MatchState) hash(a []byte, offs hVal) {
 		}
 	}
 
-	var v uint64
+	var v hKey
 	for i := 0; i < hMinMatch; i++ {
-		v ^= buzTbl[a[i]]
+		v *= hStepFactor
+		v += hKey(a[i])
 	}
 
-	hBits := uint64(hashSz - 1)
+	hBits := hKey(hashSz - 1)
 	hMask := hashMask(hashSz, len(a))
 	lenA := len(a)
 	for i := hMinMatch; i < lenA; i++ {
-		v ^= buzTbl[a[i]] ^ buzTbl[a[i-hMinMatch]]
+		v *= hStepFactor
+		v += hKey(a[i])
+		v -= hKey(a[i-hMinMatch]) * hSubFactor
+
 		if v&hMask != hMask {
 			continue
 		}
-		h[v&hBits] = hVal(i) + base + offs
+	  h[v&hBits] = hVal(i) + base + offs
 	}
 
 	// save to matchState (meh; should maybe be own class)
@@ -227,13 +240,13 @@ func (s *MatchState) match() {
 				s.B = b
 				s.putLiteral(0, len(b))
 			}
-			//fmt.Println("survived writing literal.")
 			return
 		}
-		var v uint64
+		var v hKey
 		//fmt.Println("initing hash")
 		for i := 0; i < hMinMatch; i++ {
-			v ^= buzTbl[b[i]]
+		    v *= hStepFactor
+		    v += hKey(b[i])
 		}
 
 		// step through b for a match
@@ -241,7 +254,9 @@ func (s *MatchState) match() {
 		//fmt.Println("hashing the rest")
 		for i := hMinMatch; i < len(b); i++ {
 			// Find a match in the hashtable
-			v ^= buzTbl[b[i]] ^ buzTbl[b[i-hMinMatch]]
+	    v *= hStepFactor
+	    v += hKey(b[i])
+	    v -= hKey(b[i-hMinMatch]) * hSubFactor
 			if v&hMask != hMask {
 				continue
 			}
@@ -304,6 +319,13 @@ func (s *MatchState) Diff() {
 	}
 	s.active = true
 	s.cursor = 0
+	
+	if bytes.Equal(s.A, s.B) {
+	  s.putCopy(0, len(s.A))
+	  s.putEnd()
+	  s.active = false
+	  return
+	}
 
 	aStart, bStart := 0, 0
 
