@@ -384,21 +384,22 @@ func (dpr *DPReader) ReadSegment() bool { // writes to self.out
 	if err != nil {
 		panic("couldn't read expected checksum")
 	}
-	cksum := dpchecksum(orig)
-	if cksum != sourceCksum {
-		panic("checksum mismatch in source--wrong/modified source file?")
-	}
 
 	text := diff.Patch(orig, dpr.in)
 
-	cksum = dpchecksum(text)
+	cksum := dpchecksum(text)
 	var fileCksum checksum
 	err = binary.Read(dpr.in, binary.BigEndian, &fileCksum)
 	if err != nil {
 		panic("couldn't read expected checksum")
 	}
 	if cksum != fileCksum {
-		panic("checksum mismatch in output")
+		origCksum := dpchecksum(orig)
+		if origCksum != sourceCksum {
+			panic("checksum mismatch in source--wrong/modified source file?")
+		} else {
+			panic("checksum mismatch in output")
+		}
 	}
 
 	dpr.lastSeg = text
