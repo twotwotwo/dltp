@@ -21,56 +21,60 @@ given path "a.xml", open a.xml, a.xml.gz, or a.xml.bz2, and either pipe via
 a native decompressor or use go's own. either way, return a Reader.
 
 NewWriter/NewReader:
-pipe through a native compressor (pigz, gzip; you can imagine (l)bzip2, too)
-or use go's own gzip
+pipe through a native compressor or use go's own gzip
 
 */
 
+var suffixes = []string{"", ".lzo", ".gz", ".bz2", ".xz"}
+var programs = map[string]string{
+  "lzo": "lzop",
+  "gz": "pigz gzip",
+  "bz2": "lbzip2 bzip2",
+  "xz": "xz",
+}
+
 func Open(path string) (s stream.Stream, err error) {
-	suffixes := []string{"", ".gz", ".bz2", ".xz"}
 	var file *os.File
+
+  // try to open a raw file, then known compressed formats
+  for _, suffix := range suffixes {
+    file, err = os.Open(path + suffix)
+    if err != nil {
+	    if os.IsNotExist(err) {
+		    continue
+	    }
+	    return nil, err
+    }
+    break
+  }
+  
+  // didn't find it, sigh
+  if file == nil {
+    return nil, os.ErrNotExist
+  }
+
+	var compressedReader io.Reader
+	
 	for _, suffix := range suffixes {
-		file, err = os.Open(path + suffix)
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return nil, err
-		}
-		break
-	}
-	if file == nil {
-		return nil, os.ErrNotExist
-	}
-
-	var reader io.Reader
-
-	if strings.HasSuffix(file.Name(), ".gz") {
-		reader, err = NewReader(file, "gz")
-		if err != nil {
-			return nil, err
-		}
-	}
-	if strings.HasSuffix(file.Name(), ".bz2") {
-		reader, err = NewReader(file, "bz2")
-		if err != nil {
-			return nil, err
-		}
-	}
-	if strings.HasSuffix(file.Name(), ".xz") {
-		reader, err = NewReader(file, "xz")
-		if err != nil {
-			return nil, err
-		}
+	  if suffix == "" {
+	    continue
+	  }
+	  if !strings.HasSuffix(file.Name(), suffix) {
+	    continue
+	  }
+	  compressedReader, err = NewReader(file, suffix[1:])
+	  if err != nil {
+		  return nil, err
+	  }
+	  break
 	}
 
-	if reader == nil {
+  // return a Reader/ReaderAt, either file or wrapper
+	if compressedReader == nil {
 		return file, nil
 	} else {
-		return stream.NewReaderAt(reader), nil
+		return stream.NewReaderAt(compressedReader), nil
 	}
-
-	return
 }
 
 type CmdPipe struct {
@@ -93,21 +97,23 @@ func (c *CmdPipe) Close() error {
 
 func findZipper(format string) string {
 	cmdPath, err := "", error(nil)
-	if format == "bz2" {
-		cmdPath, err = exec.LookPath("lbzip2")
-		if err != nil {
-			cmdPath, err = exec.LookPath("bzip2")
-		}
-	} else if format == "gz" {
-		cmdPath, err = exec.LookPath("pigz")
-		if err != nil {
-			cmdPath, err = exec.LookPath("gzip")
-		}
-	} else if format == "xz" {
-		cmdPath, err = exec.LookPath("xz")
-	} else {
+
+	choicesStr := programs[format]
+	if choicesStr == "" {
 		panic("unknown compression format " + format)
 	}
+
+	choices := strings.Split(choicesStr, " ")
+	for _, cmd := range choices {
+		cmdPath, err = exec.LookPath(cmd)
+	}
+	if err != nil {
+	  panic("couldn't find (de)compressor for " + format + ": " + err.Error())
+	}
+	if cmdPath == "" {
+	  panic("couldn't find (de)compressor for " + format)
+	}
+	
 	return cmdPath
 }
 
