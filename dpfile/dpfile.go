@@ -19,7 +19,6 @@ import (
 	"path"
 	"regexp" // validating input filenames
 	"runtime"
-	"strings" // working w/filenames
 )
 
 /*
@@ -125,9 +124,9 @@ type DPReader struct {
 
 var MaxSourceLength = uint64(1e8)
 
-func NewWriter(zOut io.WriteCloser, sourceNames []string, lastRevOnly bool, limitToNS bool, ns int, cutMeta bool) (dpw DPWriter) {
+func NewWriter(zOut io.WriteCloser, workingDir *os.File, sourceNames []string, lastRevOnly bool, limitToNS bool, ns int, cutMeta bool) (dpw DPWriter) {
 	for i, name := range sourceNames {
-		r, err := zip.Open(name)
+		r, err := zip.Open(name, workingDir)
 		if err != nil {
 			panic("cannot open source: " + err.Error())
 		}
@@ -148,9 +147,7 @@ func NewWriter(zOut io.WriteCloser, sourceNames []string, lastRevOnly bool, limi
 		panic(err)
 	}
 	for _, name := range sourceNames {
-		niceOutName := path.Base(name)
-		niceOutName = strings.Replace(niceOutName, ".gz", "", 1)
-		niceOutName = strings.Replace(niceOutName, ".bz2", "", 1)
+		niceOutName := zip.UnzippedName(path.Base(name))
 		fmt.Fprintln(dpw.out, niceOutName)
 	}
 	err = dpw.out.WriteByte('\n')
@@ -336,7 +333,7 @@ func NewReader(in io.Reader, workingDir *os.File, streaming bool) (dpr DPReader)
 			continue
 		}
 		sourcePath := path.Join(dirName, sourceName)
-		zipReader, err := zip.Open(sourcePath)
+		zipReader, err := zip.Open(sourcePath, workingDir)
 		if err != nil {
 			panic("could not open source " + sourceName + ": " + err.Error())
 		}

@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/twotwotwo/dltp/stream"
 	"github.com/twotwotwo/dltp/dpfile"
 	"github.com/twotwotwo/dltp/zip"
 
@@ -24,16 +25,13 @@ import (
 
 const OutSuffix string = ".dltp"
 
-func WriteDiffPack(out io.WriteCloser, inNames []string) {
+func WriteDiffPack(out io.WriteCloser, workingDir *os.File, inNames []string) {
 	if len(inNames) < 2 {
 		panic("need at least an input file and a source file")
 	}
 	// open outfile
 	if out == nil {
-		outName := inNames[0]
-		outName = strings.Replace(outName, ".gz", "", 1)
-		outName = strings.Replace(outName, ".bz2", "", 1)
-		outName += OutSuffix
+		outName := zip.UnzippedName(inNames[0]) + OutSuffix
 
 		compression := ""
 		if !(*bz2 || *gz || *xz || *raw) {
@@ -68,58 +66,20 @@ func WriteDiffPack(out io.WriteCloser, inNames []string) {
 		}
 	}
 	// newwriter
-	w := dpfile.NewWriter(out, inNames, *lastRev, limitToNS, ns, *cutMeta)
+	w := dpfile.NewWriter(out, workingDir, inNames, *lastRev, limitToNS, ns, *cutMeta)
 	for w.WriteSegment() {
 	}
 	w.Close()
 }
 
-func ReadDiffPack(dp *os.File) {
-	// use its dir as the working dir
-
-	// defaults
-	workingDirName := "."
-	compression := ""
-	if dp != os.Stdin {
-		workingDirName = path.Dir(dp.Name())
-		if strings.HasSuffix(dp.Name(), ".gz") {
-			compression = "gz"
-		}
-		if strings.HasSuffix(dp.Name(), ".bz2") {
-			compression = "bz2"
-		}
-		if strings.HasSuffix(dp.Name(), ".xz") {
-			compression = "xz"
-		}
-		if strings.HasSuffix(dp.Name(), ".dp") {
-			compression = ""
-		}
-	}
-
-	workingDir, err := os.Open(workingDirName)
-	if err != nil {
-		panic(err)
-	}
-
-	input := io.Reader(nil)
-	if compression != "" {
-		input, err = zip.NewReader(dp, compression)
-	} else {
-		input = dp
-	}
-	if err != nil {
-		panic(err)
-	}
-
-	// make the reader; log the filename
-	streaming := dp == os.Stdin
+func ReadDiffPack(dp io.Reader, workingDir *os.File, streaming bool) {
 	if *useFile {
 		streaming = false
 	}
 	if *useStdout {
 		streaming = true
 	}
-	r := dpfile.NewReader(input, workingDir, streaming)
+	r := dpfile.NewReader(dp, workingDir, streaming)
 	// readsegment while we can
 	for r.ReadSegment() {
 	}
@@ -309,7 +269,7 @@ func main() {
 	} else if *merge {
 		var sources = make([]io.Reader, len(filenames))
 		for i, fn := range filenames {
-			f, err := zip.Open(fn)
+			f, err := zip.Open(fn, nil)
 			if err != nil {
 				quitWith("can't open source " + fn + ": " + err.Error())
 			}
@@ -317,19 +277,47 @@ func main() {
 		}
 		Merge(sources, os.Stdout)
 	} else if len(filenames) < 2 { //expand
-		var dp *os.File
+		var dp stream.Stream
 		var err error
+
+	  // decide on working dir
+	  var workingDir *os.File
+	  if len(filenames) == 0 || strings.HasPrefix(filenames[0], "http://") {
+		  currentDir, err := os.Getwd()
+	    if err != nil {
+	      quitWith("can't get current dir, what kind of nonsense?")
+	    }
+		  workingDir, err = os.Open(currentDir)
+	  } else {
+	    currentDir := path.Dir(filenames[0])
+		  workingDir, err = os.Open(currentDir)
+	  }
+	  if err != nil {
+	    quitWith("can't open source directory")
+	  }
+	  
+	  streaming := false // we're always streaming, but sometimes stdin's involved
 		if len(filenames) == 1 {
-			dp, err = os.Open(filenames[0])
+			dp, err = zip.Open(filenames[0], workingDir)
 			if err != nil {
 				quitWith("can't open source " + filenames[0] + ": " + err.Error())
 			}
 		} else {
 			dp = os.Stdin
+			streaming = true
 		}
-		ReadDiffPack(dp)
+		ReadDiffPack(dp, workingDir, streaming)
+
 		os.Stdout.Close()
 	} else { //pack
-		WriteDiffPack(nil, filenames)
+	  dir := path.Dir(filenames[0])
+	  if strings.HasPrefix(dir, "http://") {
+	      dir = "."
+	  }
+    dirFile, err := os.Open(dir)
+    if err != nil {
+      panic(err)
+    }
+		WriteDiffPack(nil, dirFile, filenames)
 	}
 }

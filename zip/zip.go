@@ -6,11 +6,16 @@ import (
 	"compress/bzip2"                   // ditto but uncompress only
 	"compress/gzip"                    // fallback f/no pipeable gzip present (e.g., Windows)
 	"github.com/twotwotwo/dltp/stream" // allow skipping fwd through streams
+	"github.com/twotwotwo/dltp/httpfile" // who doznt like it.
 	"io"
 	"os"
 	"os/exec"
 	"strings" // filename fun
 )
+
+// know what would be cool to support here? snappy
+// https://code.google.com/p/snappy-go/
+// same purpose lzo serves now ("free" compression to speed disk I/O)
 
 /*
 
@@ -33,24 +38,42 @@ var programs = map[string]string{
   "xz": "xz",
 }
 
-func Open(path string) (s stream.Stream, err error) {
-	var file *os.File
-
-  // try to open a raw file, then known compressed formats
-  for _, suffix := range suffixes {
-    file, err = os.Open(path + suffix)
-    if err != nil {
-	    if os.IsNotExist(err) {
-		    continue
-	    }
-	    return nil, err
+// Name without any known zip suffixes attached.
+func UnzippedName(path string) (string) {
+  previousPath := ""
+  for previousPath != path {
+    previousPath = path
+    for _, suffix := range suffixes[1:] {
+      if strings.HasSuffix(path, suffix) {
+        path = path[:len(path)-len(suffix)]
+      }
     }
-    break
+  }
+  return path
+}
+
+func Open(path string, workingDir *os.File) (s stream.Stream, err error) {
+	reader := stream.Stream(nil)
+
+  if strings.HasPrefix(path, "http://") {
+    reader, err = httpfile.Open(path, workingDir)
+  } else {
+    // try to open a raw file, then known compressed formats
+    for _, suffix := range suffixes {
+      reader, err = os.Open(path + suffix)
+      if err != nil {
+	      if os.IsNotExist(err) {
+		      continue
+	      }
+	      break
+      }
+      break
+    }
   }
   
   // didn't find it, sigh
-  if file == nil {
-    return nil, os.ErrNotExist
+  if err != nil {
+    return nil, err
   }
 
 	var compressedReader io.Reader
@@ -59,10 +82,10 @@ func Open(path string) (s stream.Stream, err error) {
 	  if suffix == "" {
 	    continue
 	  }
-	  if !strings.HasSuffix(file.Name(), suffix) {
+	  if !strings.HasSuffix(path, suffix) {
 	    continue
 	  }
-	  compressedReader, err = NewReader(file, suffix[1:])
+	  compressedReader, err = NewReader(reader, suffix[1:])
 	  if err != nil {
 		  return nil, err
 	  }
@@ -71,7 +94,7 @@ func Open(path string) (s stream.Stream, err error) {
 
   // return a Reader/ReaderAt, either file or wrapper
 	if compressedReader == nil {
-		return file, nil
+		return reader, nil
 	} else {
 		return stream.NewReaderAt(compressedReader), nil
 	}
