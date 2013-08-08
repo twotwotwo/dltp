@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/twotwotwo/dltp/stream"
 	"github.com/twotwotwo/dltp/dpfile"
+	"github.com/twotwotwo/dltp/stream"
 	"github.com/twotwotwo/dltp/zip"
 
 	// for -cut mode
@@ -31,7 +31,7 @@ func WriteDiffPack(out io.WriteCloser, workingDir *os.File, inNames []string) {
 	}
 	// open outfile
 	if out == nil {
-		outName := zip.UnzippedName(inNames[0]) + OutSuffix
+		outName := zip.UnzippedName(path.Base(inNames[0])) + OutSuffix
 
 		compression := ""
 		if !(*bz2 || *gz || *xz || *raw) {
@@ -54,7 +54,7 @@ func WriteDiffPack(out io.WriteCloser, workingDir *os.File, inNames []string) {
 		if compression != "" {
 			outName += "." + compression
 		}
-		outFile, err := os.Create(outName)
+		outFile, err := os.Create(path.Join(workingDir.Name(), outName))
 		if err != nil {
 			panic(err)
 		}
@@ -280,23 +280,23 @@ func main() {
 		var dp stream.Stream
 		var err error
 
-	  // decide on working dir
-	  var workingDir *os.File
-	  if len(filenames) == 0 || strings.HasPrefix(filenames[0], "http://") {
-		  currentDir, err := os.Getwd()
-	    if err != nil {
-	      quitWith("can't get current dir, what kind of nonsense?")
-	    }
-		  workingDir, err = os.Open(currentDir)
-	  } else {
-	    currentDir := path.Dir(filenames[0])
-		  workingDir, err = os.Open(currentDir)
-	  }
-	  if err != nil {
-	    quitWith("can't open source directory")
-	  }
-	  
-	  streaming := false // we're always streaming, but sometimes stdin's involved
+		// decide on working dir
+		var workingDir *os.File
+		if len(filenames) == 0 || strings.HasPrefix(filenames[0], "http://") {
+			currentDir, err := os.Getwd()
+			if err != nil {
+				quitWith("can't get current dir, what kind of nonsense?")
+			}
+			workingDir, err = os.Open(currentDir)
+		} else {
+			currentDir := path.Dir(filenames[0])
+			workingDir, err = os.Open(currentDir)
+		}
+		if err != nil {
+			quitWith("can't open source directory")
+		}
+
+		streaming := false // we're always streaming, but sometimes stdin's involved
 		if len(filenames) == 1 {
 			dp, err = zip.Open(filenames[0], workingDir)
 			if err != nil {
@@ -310,14 +310,14 @@ func main() {
 
 		os.Stdout.Close()
 	} else { //pack
-	  dir := path.Dir(filenames[0])
-	  if strings.HasPrefix(dir, "http://") {
-	      dir = "."
-	  }
-    dirFile, err := os.Open(dir)
-    if err != nil {
-      panic(err)
-    }
+		dir := path.Dir(filenames[0])
+		if strings.HasPrefix(filenames[0], "http://") {
+			dir = "."
+		}
+		dirFile, err := os.Open(dir)
+		if err != nil {
+			panic(err)
+		}
 		WriteDiffPack(nil, dirFile, filenames)
 	}
 }

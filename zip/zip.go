@@ -3,10 +3,10 @@
 package zip
 
 import (
-	"compress/bzip2"                   // ditto but uncompress only
-	"compress/gzip"                    // fallback f/no pipeable gzip present (e.g., Windows)
-	"github.com/twotwotwo/dltp/stream" // allow skipping fwd through streams
+	"compress/bzip2"                     // ditto but uncompress only
+	"compress/gzip"                      // fallback f/no pipeable gzip present (e.g., Windows)
 	"github.com/twotwotwo/dltp/httpfile" // who doznt like it.
+	"github.com/twotwotwo/dltp/stream"   // allow skipping fwd through streams
 	"io"
 	"os"
 	"os/exec"
@@ -32,67 +32,67 @@ pipe through a native compressor or use go's own gzip
 
 var suffixes = []string{"", ".lzo", ".gz", ".bz2", ".xz"}
 var programs = map[string]string{
-  "lzo": "lzop",
-  "gz": "pigz gzip",
-  "bz2": "lbzip2 bzip2",
-  "xz": "xz",
+	"lzo": "lzop",
+	"gz":  "pigz gzip",
+	"bz2": "lbzip2 bzip2",
+	"xz":  "xz",
 }
 
 // Name without any known zip suffixes attached.
-func UnzippedName(path string) (string) {
-  previousPath := ""
-  for previousPath != path {
-    previousPath = path
-    for _, suffix := range suffixes[1:] {
-      if strings.HasSuffix(path, suffix) {
-        path = path[:len(path)-len(suffix)]
-      }
-    }
-  }
-  return path
+func UnzippedName(path string) string {
+	previousPath := ""
+	for previousPath != path {
+		previousPath = path
+		for _, suffix := range suffixes[1:] {
+			if strings.HasSuffix(path, suffix) {
+				path = path[:len(path)-len(suffix)]
+			}
+		}
+	}
+	return path
 }
 
 func Open(path string, workingDir *os.File) (s stream.Stream, err error) {
 	reader := stream.Stream(nil)
 
-  if strings.HasPrefix(path, "http://") {
-    reader, err = httpfile.Open(path, workingDir)
-  } else {
-    // try to open a raw file, then known compressed formats
-    for _, suffix := range suffixes {
-      reader, err = os.Open(path + suffix)
-      if err != nil {
-	      if os.IsNotExist(err) {
-		      continue
-	      }
-	      break
-      }
-      break
-    }
-  }
-  
-  // didn't find it, sigh
-  if err != nil {
-    return nil, err
-  }
-
-	var compressedReader io.Reader
-	
-	for _, suffix := range suffixes {
-	  if suffix == "" {
-	    continue
-	  }
-	  if !strings.HasSuffix(path, suffix) {
-	    continue
-	  }
-	  compressedReader, err = NewReader(reader, suffix[1:])
-	  if err != nil {
-		  return nil, err
-	  }
-	  break
+	if strings.HasPrefix(path, "http://") {
+		reader, err = httpfile.Open(path, workingDir)
+	} else {
+		// try to open a raw file, then known compressed formats
+		for _, suffix := range suffixes {
+			reader, err = os.Open(path + suffix)
+			if err != nil {
+				if os.IsNotExist(err) {
+					continue
+				}
+				break
+			}
+			break
+		}
 	}
 
-  // return a Reader/ReaderAt, either file or wrapper
+	// didn't find it, sigh
+	if err != nil {
+		return nil, err
+	}
+
+	var compressedReader io.Reader
+
+	for _, suffix := range suffixes {
+		if suffix == "" {
+			continue
+		}
+		if !strings.HasSuffix(path, suffix) {
+			continue
+		}
+		compressedReader, err = NewReader(reader, suffix[1:])
+		if err != nil {
+			return nil, err
+		}
+		break
+	}
+
+	// return a Reader/ReaderAt, either file or wrapper
 	if compressedReader == nil {
 		return reader, nil
 	} else {
@@ -131,12 +131,12 @@ func findZipper(format string) string {
 		cmdPath, err = exec.LookPath(cmd)
 	}
 	if err != nil {
-	  panic("couldn't find (de)compressor for " + format + ": " + err.Error())
+		panic("couldn't find (de)compressor for " + format + ": " + err.Error())
 	}
 	if cmdPath == "" {
-	  panic("couldn't find (de)compressor for " + format)
+		panic("couldn't find (de)compressor for " + format)
 	}
-	
+
 	return cmdPath
 }
 

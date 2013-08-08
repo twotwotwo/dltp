@@ -91,10 +91,11 @@ func writeUvarint(w io.Writer, val int) {
 }
 
 type checksum uint32
+
 func dpchecksum(text []byte) checksum {
-  h := fnv.New32a()
-  h.Write(text)
-  return checksum(h.Sum32())
+	h := fnv.New32a()
+	h.Write(text)
+	return checksum(h.Sum32())
 }
 
 type DiffTask struct {

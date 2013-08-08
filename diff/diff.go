@@ -46,13 +46,13 @@ usage, roughly:
   s.Out.WriteTo(os.Stdout)
 
 other fields of matchState store stuff like the hash table (h), the value in it
-corresponding to the start of a (base), the "current position" in a during the 
-match (cursor), and a mask (hMask) indicating which bits of the rolling hash 
-have to be 1 for the offset to be put in the hashtable (a trick stolen from 
+corresponding to the start of a (base), the "current position" in a during the
+match (cursor), and a mask (hMask) indicating which bits of the rolling hash
+have to be 1 for the offset to be put in the hashtable (a trick stolen from
 rzip).
 
 the matching itself isn't as clever as other diff engines, and you probably pay
-in diff size. it uses a fixed hashtable size of 128k entries and doesn't 
+in diff size. it uses a fixed hashtable size of 128k entries and doesn't
 consider multiple match possibilities at an offset.
 
 MatchStates can be reused to save allocations.
@@ -131,15 +131,15 @@ func (s *MatchState) putEnd() {
 	}
 }
 
-var hashSz = 1<<17
+var hashSz = 1 << 17
 var hMinMatch = 24
 
 func hKeyPow(vIn hKey, p int) (v hKey) {
-  v = vIn
-  for i := 1; i < p; i++ {
-    v *= vIn
-  }
-  return
+	v = vIn
+	for i := 1; i < p; i++ {
+		v *= vIn
+	}
+	return
 }
 
 var hStepFactor = hKey(16777619) // FNV's
@@ -196,7 +196,7 @@ func (s *MatchState) hash(a []byte, offs hVal) {
 		if v&hMask != hMask {
 			continue
 		}
-	  h[v&hBits] = hVal(i) + base + offs
+		h[v&hBits] = hVal(i) + base + offs
 	}
 
 	// save to matchState (meh; should maybe be own class)
@@ -245,8 +245,8 @@ func (s *MatchState) match() {
 		var v hKey
 		//fmt.Println("initing hash")
 		for i := 0; i < hMinMatch; i++ {
-		    v *= hStepFactor
-		    v += hKey(b[i])
+			v *= hStepFactor
+			v += hKey(b[i])
 		}
 
 		// step through b for a match
@@ -254,9 +254,9 @@ func (s *MatchState) match() {
 		//fmt.Println("hashing the rest")
 		for i := hMinMatch; i < len(b); i++ {
 			// Find a match in the hashtable
-	    v *= hStepFactor
-	    v += hKey(b[i])
-	    v -= hKey(b[i-hMinMatch]) * hSubFactor
+			v *= hStepFactor
+			v += hKey(b[i])
+			v -= hKey(b[i-hMinMatch]) * hSubFactor
 			if v&hMask != hMask {
 				continue
 			}
@@ -319,12 +319,12 @@ func (s *MatchState) Diff() {
 	}
 	s.active = true
 	s.cursor = 0
-	
+
 	if bytes.Equal(s.A, s.B) {
-	  s.putCopy(0, len(s.A))
-	  s.putEnd()
-	  s.active = false
-	  return
+		s.putCopy(0, len(s.A))
+		s.putEnd()
+		s.active = false
+		return
 	}
 
 	aStart, bStart := 0, 0
