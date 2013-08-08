@@ -33,34 +33,16 @@ func WriteDiffPack(out io.WriteCloser, workingDir *os.File, inNames []string) {
 	if out == nil {
 		outName := zip.UnzippedName(path.Base(inNames[0])) + OutSuffix
 
-		compression := ""
-		if !(*bz2 || *gz || *xz || *raw) {
-			if zip.CanWrite("bz2") {
-				*bz2 = true
-			} else if zip.CanWrite("gz") {
-				*gz = true
-			} else {
-				*raw = true
-			}
-		}
-		if *bz2 {
-			compression = "bz2"
-		} else if *gz {
-			compression = "gz"
-		} else if *xz {
-			compression = "xz"
-		}
-
-		if compression != "" {
-			outName += "." + compression
+		if *compression != "" {
+			outName += "." + *compression
 		}
 		outFile, err := os.Create(path.Join(workingDir.Name(), outName))
 		if err != nil {
 			panic(err)
 		}
 
-		if compression != "" {
-			out = zip.NewWriter(outFile, compression)
+		if *compression != "" {
+			out = zip.NewWriter(outFile, *compression)
 		} else {
 			out = outFile
 		}
@@ -159,14 +141,10 @@ var nsString = flag.String("ns", "", "limit to pages in given <ns>")
 var cutMeta = flag.Bool("cutmeta", false, "cut <contributor>/<comment>/<minor>")
 var cut = flag.Bool("cut", false, "just output a cut down stdin (don't pack)")
 var merge = flag.Bool("merge", false, "merge files listed on command line (newest first) to stdout")
+var compression = flag.String("zip", "auto", "set output compression (bz2, gz, lzo, none)")
 
 var limitToNS = false
 var ns = 0
-
-var bz2 = flag.Bool("j", false, "try to use bzip")
-var gz = flag.Bool("z", false, "try to use gzip")
-var xz = flag.Bool("x", false, "try to use xz")
-var raw = flag.Bool("r", false, "raw output")
 
 func quitWith(format string, a ...interface{}) {
 	fmt.Printf("Error: "+format+"\n", a...)
@@ -176,13 +154,13 @@ func quitWith(format string, a ...interface{}) {
 func main() {
 	flag.Parse()
 	args := flag.Args()
-
+	
 	if *merge {
-		if *bz2 || *gz || *xz || *raw || *useStdout || *useFile {
+		if *useStdout || *useFile {
 			quitWith("only -lastrev, -ns, and -cutmeta work with -merge")
 		}
 	} else if *cut {
-		if *bz2 || *gz || *xz || *raw || *useStdout || *useFile {
+		if *useStdout || *useFile {
 			quitWith("only -lastrev, -ns, and -cutmeta work with -cut")
 		}
 		if *merge {
@@ -195,7 +173,7 @@ func main() {
 			quitWith("-cut only streams from stdin to stdout")
 		}
 	} else if len(args) < 2 { // validate other args as if unpacking
-		if *bz2 || *gz || *xz || *raw {
+		if *compression != "auto" {
 			quitWith("compression options only work when packing")
 		}
 		if *useFile && *useStdout {
@@ -208,30 +186,28 @@ func main() {
 			quitWith("-ns only used when packing")
 		}
 	} else { // validate as if packing
-		compressOpts := 0
-		if *bz2 {
-			if !zip.CanWrite("bz2") {
-				quitWith("can't write .bz2 on this system")
-			}
-			compressOpts++
+		if *compression == "auto" {
+		    	if zip.CanWrite("bz2") {
+		    	    *compression = "bz2"
+		    	} else {
+		    	    *compression = "gz"
+		    	}
 		}
-		if *gz {
-			compressOpts++
+		if *compression == "none" {
+		        *compression = ""
 		}
-		if *xz {
-			if !zip.CanWrite("xz") {
-				quitWith("can't write .xz on this system")
-			}
-			compressOpts++
+		*compression = zip.CanonicalFormatName(*compression)
+		if !zip.IsKnown(*compression) {
+			quitWith("unknown compression type '" + *compression + "'")
 		}
-		if *raw {
-			compressOpts++
-		}
-		if compressOpts > 1 {
-			quitWith("you can only choose one compression option (-j/-z/-x/-r)")
+		if !zip.CanWrite(*compression) {
+			quitWith("can't find (un)packer for ." + *compression)
 		}
 		if *useFile {
-			quitWith("for now, -f is redundant when packing")
+			quitWith("-f is redundant when packing")
+		}
+		if *useStdout {
+			quitWith("-c not allowed when packing (won't pack to stdout)")
 		}
 
 		if *nsString != "" {

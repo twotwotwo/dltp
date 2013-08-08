@@ -37,6 +37,10 @@ var programs = map[string]string{
 	"bz2": "lbzip2 bzip2",
 	"xz":  "xz",
 }
+var canonicalFormatNames = map[string]string{
+	"bzip2": "bz2",
+	"gzip": "gz",
+}
 
 // Name without any known zip suffixes attached.
 func UnzippedName(path string) string {
@@ -50,6 +54,17 @@ func UnzippedName(path string) string {
 		}
 	}
 	return path
+}
+
+func CanonicalFormatName(compression string) string {
+	if canonicalFormatNames[compression] != "" {
+		return canonicalFormatNames[compression]
+	}
+	return compression
+}
+
+func IsKnown(compression string) bool {
+	return programs[compression] != ""
 }
 
 func Open(path string, workingDir *os.File) (s stream.Stream, err error) {

@@ -2,21 +2,29 @@
 
 Delta-pack (or expand) an XML dump from MediaWiki, using past dumps as a reference. 
 
+Or, with -cut and -merge options, just combine dumps or cut info you don't need out of them to get something smaller.
+
+##Packing and unpacking
+
 > dltp [-c] foo.dltp.bz2
 
-Unpacks a .dltp.bz2 (or .dltp.gz, etc.) file. The old XML dump(s) referenced by the delta need to exist in the same directory, and it's OK if they're compressed with bzip2 or gzip (or lzop or xz, if we can pipe through them). `-c` forces output to stdout.
+Unpacks a .dltp.bz2 (or .dltp.gz, etc.) file. The old XML dump(s) referenced by the delta need to exist in the same directory. `-c` forces output to stdout.
 
-It works to pipe a .dltp file (uncompressed) to stdin; then the program looks for reference file(s) in the current directory and send XML to stdout by default. `-f` redirects that output to a file (which is named automatically; don't put a name on the command line) in the current directory.
-
-On Windows, bzip2 decompression is in Go and a bit slower, so you may want to store files gzipped or uncompressed. On Unix, installing lbzip2 will speed decompression by using multiple cores.
+It works to pipe a .dltp file (uncompressed) to stdin; then the program looks for reference file(s) in the current directory and send XML to stdout by default. `-f` redirects that output to a file (which is named automatically) in the current directory.
 
 > dltp new.xml reference1.xml [reference2.xml...]
 
 Packs a new MediaWiki XML dump using the old file(s) as reference. If you have multiple reference files (like several days of adds-changes dumps), list the newest file first.
 
-Output is piped through lbzip2 or bzip2 unless you request otherwise: `-z` forces gzip and `-r` disables compression entirely. Input files may be compressed.
+##Secondary compression with bzip, etc.
 
-On Windows, .dltp.gz is produced by default instead of .dltp.bz2, because there is no pure-Go bz2 packer.
+On Linux, compression and decompression of both XML and .dltp files happen by piping through some (de)compression utility you have installed. You can speed up bzip2 (de)compression by installing lbzip2 (which uses multiple cores), and you can store your source files as .lzo (install lzop) or .gz for faster reading. 
+
+On Windows, piping isn't currently possible and (de)compression goes at less than native speed. You may want to unpack files with native tools before feeding them to dltp.
+
+When packing, the -zip option lets you choose an output compression format (none, lzo, gz, bz2, or xz). The default is 'auto', which means .bz2 on Linux as long as a bzip2 binary is in the PATH, and .gz otherwise.
+
+##Cutting and merging
 
 > dltp -cut [-lastrev] [-ns 0] [-cutmeta] < dump.xml
 
@@ -32,7 +40,11 @@ Merges a set of files to stdout. For a given page ID, the version from the leftm
 
 You may pass `-merge` any of the options `-cut` accepts.
 
-## Caveats
+##Passing URLs on the command line
+
+If you're feeling daring, you can pass http:// (but not https://) URLs on the command line instead of files. Note that the whole file is downloaded (so you still need the space) and there's no way to resume an interrupted download.
+
+##Caveats
 This is not stable, heavily tested software. It has no warranty, and breaking changes to the format will happen.  I'd love to know if you're interested in using or working on it, though.
 
 Public domain, 2013; no warranty.
