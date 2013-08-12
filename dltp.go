@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime/pprof"
 	"strconv"
 	"strings"
@@ -31,7 +32,9 @@ func WriteDiffPack(out io.WriteCloser, workingDir *os.File, inNames []string) {
 	}
 	// open outfile
 	if out == nil {
-		outName := zip.UnzippedName(path.Base(inNames[0])) + OutSuffix
+		// baseName is right for both URLs + Windows file paths
+		baseName := path.Base(filepath.Base(inNames[0]))
+		outName := zip.UnzippedName(baseName) + OutSuffix
 
 		if *compression != "" {
 			outName += "." + *compression
@@ -265,7 +268,7 @@ func main() {
 			}
 			workingDir, err = os.Open(currentDir)
 		} else {
-			currentDir := path.Dir(filenames[0])
+			currentDir := filepath.Dir(filenames[0])
 			workingDir, err = os.Open(currentDir)
 		}
 		if err != nil {
@@ -286,7 +289,7 @@ func main() {
 
 		os.Stdout.Close()
 	} else { //pack
-		dir := path.Dir(filenames[0])
+		dir := filepath.Dir(filenames[0])
 		if strings.HasPrefix(filenames[0], "http://") {
 			dir = "."
 		}

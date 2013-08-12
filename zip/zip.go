@@ -134,7 +134,7 @@ func (c *CmdPipe) Close() error {
 }
 
 func findZipper(format string) string {
-	cmdPath, err := "", error(nil)
+	cmdPath := ""
 
 	choicesStr := programs[format]
 	if choicesStr == "" {
@@ -143,13 +143,7 @@ func findZipper(format string) string {
 
 	choices := strings.Split(choicesStr, " ")
 	for _, cmd := range choices {
-		cmdPath, err = exec.LookPath(cmd)
-	}
-	if err != nil {
-		panic("couldn't find (de)compressor for " + format + ": " + err.Error())
-	}
-	if cmdPath == "" {
-		panic("couldn't find (de)compressor for " + format)
+		cmdPath, _ = exec.LookPath(cmd) // err just means not found
 	}
 
 	return cmdPath

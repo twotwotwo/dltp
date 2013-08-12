@@ -17,6 +17,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp" // validating input filenames
 	"runtime"
 )
@@ -148,7 +149,9 @@ func NewWriter(zOut io.WriteCloser, workingDir *os.File, sourceNames []string, l
 		panic(err)
 	}
 	for _, name := range sourceNames {
-		niceOutName := zip.UnzippedName(path.Base(name))
+		// baseName is right for both URLs + Windows file paths
+		baseName := path.Base(filepath.Base(name))
+		niceOutName := zip.UnzippedName(baseName)
 		fmt.Fprintln(dpw.out, niceOutName)
 	}
 	err = dpw.out.WriteByte('\n')
@@ -273,7 +276,7 @@ func readLineOrPanic(in *bufio.Reader) string {
 
 var safeFilenamePat *regexp.Regexp
 
-const safeFilenameStr = "^[a-zA-Z0-9_\\-.]*$"
+const safeFilenameStr = "^[-a-zA-Z0-9_.]*$"
 
 func panicOnUnsafeName(filename string) string {
 	if safeFilenamePat == nil {

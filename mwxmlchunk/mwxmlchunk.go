@@ -21,7 +21,7 @@ ReadTo(key) -> [same]
 
 */
 
-type SegmentKey int
+type SegmentKey int64
 
 var StartKey SegmentKey = 0
 var PastEndKey SegmentKey = (1 << 63) - 1
