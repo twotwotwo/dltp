@@ -30,9 +30,9 @@ type Scanner struct {
 // fill s.All with more data--return bytes read in, or -1 if no data was
 // available. may expand the buffer or move data around in it.
 func (s *Scanner) fill() int64 {
-	if len(s.All) == cap(s.All) {
+	if len(s.All) == cap(s.All) { // no room
 		old := s.All
-		s.All = make([]byte, len(s.All), cap(s.All)*2)
+		s.All = make([]byte, len(s.All), cap(s.backing)*2)
 		s.backing = s.All
 		copy(s.All, old)
 	}

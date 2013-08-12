@@ -8,7 +8,6 @@ import (
 	"github.com/twotwotwo/dltp/scan"
 	sref "github.com/twotwotwo/dltp/sourceref"
 	"io"
-	//"fmt"
 )
 
 /* WALKING THROUGH PAGES

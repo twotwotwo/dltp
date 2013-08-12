@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"runtime/pprof"
@@ -166,7 +167,14 @@ func main() {
 	flag.Parse()
 	args := flag.Args()
 
-	if !*debug {
+	if *debug {
+		c := make(chan os.Signal)
+		signal.Notify(c, os.Interrupt)
+		go func(){
+		    <-c
+		    panic("interrupt")
+		}()
+	} else {
 		defer recoverAndPrintError()
 	}
 
@@ -259,8 +267,16 @@ func main() {
 		CutStdinToStdout()
 	} else if *merge {
 		var sources = make([]io.Reader, len(filenames))
+		dir := filepath.Dir(filenames[0])
+		if strings.HasPrefix(filenames[0], "http://") {
+			dir = "."
+		}
+		workingDir, err := os.Open(dir)
+		if err != nil {
+			panic(err)
+		}
 		for i, fn := range filenames {
-			f, err := zip.Open(fn, nil)
+			f, err := zip.Open(fn, workingDir)
 			if err != nil {
 				quitWith("can't open source " + fn + ": " + err.Error())
 			}
