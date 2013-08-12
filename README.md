@@ -28,17 +28,17 @@ When packing, the -zip option lets you choose an output compression format (none
 
 > dltp -cut [-lastrev] [-ns 0] [-cutmeta] < dump.xml
 
-Rather than packing or unpacking, cuts down a MediaWiki export by skipping all but the last revision in each page's history, skipping out pages outside a given namespace, or skipping contributor info and revision comments. Always streams XML from stdin to stdout.
+Rather than packing or unpacking, cuts down a MediaWiki export by skipping all but the last revision in each page's history, skipping out pages outside a given namespace, and/or skipping contributor info and revision comments. Always streams XML from stdin to stdout.
 
-You can also use the -lastrev, etc. flags while packing, if you want. The advantage to cutting down the source in a separate step is that you end up with a raw file you can use as a reference file for future diffs, post online as a standalone download, get an md5sum of, etc.
+You can also use the `-lastrev`, etc. flags while packing, if you want. The advantage to cutting down the source in a separate step is that you end up with a raw file you can use as a reference file for future diffs, post online as a standalone download, get an md5sum of, etc.
 
-Cutting using -lastrev is a good idea before compressing adds-changes dumps: dltp needs to store a whole page's history in RAM when packing or unpacking, and many revisions of a big, active page can use a lot of it.
+To save memory, right now you should usually cut adds-changes dumps down with `-lastrev`; otherwise we hold  page's whole history in memory at once, which can be a problem for big, very active pages (e.g., admin noticeboards).
 
 > dltp -merge file1.xml file2.xml [file3.xml...]
 
-Merges a set of files to stdout. For a given page ID, the version from the leftmost file on the command line takes precedence. You could use this to create something like a weekly dump out of a set of daily dumps, or to create something like an all-pages dump from an earlier all-pages dump plus adds-changes dumps. (These wouldn't be represent the wiki's current content perfectly, though, because adds-changes dumps don't cover deletion or oversighting.)
+Merges a set of files to stdout. For a given page ID, the version from the leftmost file on the command line takes precedence. You could use this to create something like a weekly dump out of a set of daily dumps, or to create something like an all-pages dump from an earlier all-pages dump plus adds-changes dumps. These wouldn't represent the wiki's latest content perfectly, though, because adds-changes dumps don't cover deletion or oversighting.
 
-You may pass `-merge` any of the options `-cut` accepts.
+You may pass `-merge` any of the options `-cut` accepts. Again, using at least `-lastrev` is a good idea to save memory when dealing with adds-changes dumps.
 
 ##Passing URLs on the command line
 
