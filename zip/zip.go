@@ -39,7 +39,7 @@ var programs = map[string]string{
 }
 var canonicalFormatNames = map[string]string{
 	"bzip2": "bz2",
-	"gzip": "gz",
+	"gzip":  "gz",
 }
 
 // Name without any known zip suffixes attached.

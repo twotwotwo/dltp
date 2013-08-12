@@ -26,7 +26,6 @@ import (
 
 const OutSuffix string = ".dltp"
 
-
 func WriteDiffPack(out io.WriteCloser, workingDir *os.File, inNames []string) {
 	if len(inNames) < 2 {
 		panic("need at least an input file and a source file")
@@ -166,11 +165,11 @@ func quitWith(format string, a ...interface{}) {
 func main() {
 	flag.Parse()
 	args := flag.Args()
-	
+
 	if !*debug {
 		defer recoverAndPrintError()
 	}
-	
+
 	if *merge {
 		if *useStdout || *useFile {
 			quitWith("only -lastrev, -ns, and -cutmeta work with -merge")
@@ -203,14 +202,14 @@ func main() {
 		}
 	} else { // validate as if packing
 		if *compression == "auto" {
-		    	if zip.CanWrite("bz2") {
-		    	    *compression = "bz2"
-		    	} else {
-		    	    *compression = "gz"
-		    	}
+			if zip.CanWrite("bz2") {
+				*compression = "bz2"
+			} else {
+				*compression = "gz"
+			}
 		}
 		if *compression == "none" {
-		        *compression = ""
+			*compression = ""
 		}
 		*compression = zip.CanonicalFormatName(*compression)
 		if !zip.IsKnown(*compression) {
