@@ -288,21 +288,26 @@ func panicOnUnsafeName(filename string) string {
 	return filename
 }
 
-// these panics should probably be more informative quitWiths, or possibly
-// error returns
 func NewReader(in io.Reader, workingDir *os.File, streaming bool) (dpr DPReader) {
 	dpr.in = bufio.NewReader(in)
 
 	formatName := readLineOrPanic(dpr.in)
 	expectedFormatName := "DeltaPacker"
+	badFormat := false
 	if formatName != expectedFormatName {
-		fmt.Println("Expected format name:", expectedFormatName)
-		panic("Doesn't look like the right file format")
+		badFormat = true
 	}
 
 	formatUrl := readLineOrPanic(dpr.in)
 	if formatUrl != "no format URL yet" {
-		panic("Format URL doesn't look compatible with this version")
+		if formatUrl[:4] == "http" {
+			panic("Format has been updated. Go to " + formatUrl + " for an updated version of this utility.")
+		}
+		badFormat = true
+	}
+
+	if badFormat {
+		panic("Didn't see the expected format name in the header. Either the input isn't actually a dltp file or the format has changed you need to download a newer version of this tool.")
 	}
 
 	sourceUrl := readLineOrPanic(dpr.in) // discard source URL

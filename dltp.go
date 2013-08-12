@@ -26,6 +26,7 @@ import (
 
 const OutSuffix string = ".dltp"
 
+
 func WriteDiffPack(out io.WriteCloser, workingDir *os.File, inNames []string) {
 	if len(inNames) < 2 {
 		panic("need at least an input file and a source file")
@@ -144,10 +145,18 @@ var nsString = flag.String("ns", "", "limit to pages in given <ns>")
 var cutMeta = flag.Bool("cutmeta", false, "cut <contributor>/<comment>/<minor>")
 var cut = flag.Bool("cut", false, "just output a cut down stdin (don't pack)")
 var merge = flag.Bool("merge", false, "merge files listed on command line (newest first) to stdout")
+var debug = flag.Bool("debug", false, "on error, show ugly but useful debug info")
 var compression = flag.String("zip", "auto", "set output compression (bz2, gz, lzo, none)")
 
 var limitToNS = false
 var ns = 0
+
+func recoverAndPrintError() {
+	if r := recover(); r != nil {
+		fmt.Println("Error: ", r)
+		os.Exit(255)
+	}
+}
 
 func quitWith(format string, a ...interface{}) {
 	fmt.Printf("Error: "+format+"\n", a...)
@@ -157,6 +166,10 @@ func quitWith(format string, a ...interface{}) {
 func main() {
 	flag.Parse()
 	args := flag.Args()
+	
+	if !*debug {
+		defer recoverAndPrintError()
+	}
 	
 	if *merge {
 		if *useStdout || *useFile {

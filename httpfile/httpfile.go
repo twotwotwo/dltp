@@ -38,6 +38,9 @@ func Open(url string, workingDir *os.File) (hf *HTTPFile, err error) {
 	if err != nil {
 		return nil, err
 	}
+	if httpResp.StatusCode != 200 {
+		return nil, errors.New("Bad HTTP status: " + httpResp.Status)
+	}
 
 	// doesn't support resume yet -- for that, open, check length, req range
 	outwriter, err := os.Create(path)
