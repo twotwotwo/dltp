@@ -143,7 +143,7 @@ func findZipper(format string) string {
 
 	choices := strings.Split(choicesStr, " ")
 	for _, cmd := range choices {
-		cmdPath, err = exec.LookPath(cmd)
+		cmdPath, err := exec.LookPath(cmd)
 		if cmdPath != "" && err == nil {
 			break
 		}
