@@ -42,7 +42,7 @@ You may pass `-merge` any of the options `-cut` accepts. Again, using at least `
 
 ##Passing URLs on the command line
 
-If you're feeling daring, you can pass http:// (but not https://) URLs on the command line instead of files. Note that the whole file is downloaded (so you still need the space) and there's no way to resume an interrupted download.
+If you're feeling daring, you can pass http:// (but not https://) URLs on the command line instead of files. Note that the whole file is downloaded (so you still need the space) and there's no way to resume an interrupted download. Finally, all downloads in parallel, and downloading more than a couple files at once on a single command line will often be blocked by the server.
 
 ##Caveats
 This is not stable, heavily tested software. It has no warranty, and breaking changes to the format will happen.  I'd love to know if you're interested in using or working on it, though.
