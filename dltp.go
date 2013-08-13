@@ -182,6 +182,14 @@ func main() {
 		if *useStdout || *useFile {
 			quitWith("only -lastrev, -ns, and -cutmeta work with -merge")
 		}
+		if *nsString != "" {
+			limitToNS = true
+			var err error
+			ns, err = strconv.Atoi(*nsString)
+			if err != nil {
+				quitWith("ns must be an integer")
+			}
+		}
 	} else if *cut {
 		if *useStdout || *useFile {
 			quitWith("only -lastrev, -ns, and -cutmeta work with -cut")
