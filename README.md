@@ -50,7 +50,7 @@ You may pass `-merge` any of the options `-cut` accepts. Again, using at least `
 
 ##Passing URLs on the command line
 
-If you're feeling daring, try something experimental and pass http:// (but not https://) URLs on the command line instead of files. Note that the whole file is saved to disk, so you still need the disk space. There's no way to resume an interrupted download, and if the whole file is already on disk the download will still start over. If you specify multiple URLs, they'll download parallel; you will likely hit a server-imposed limit if you try to download more than two files at once.
+If you're feeling daring, try something experimental and pass http:// (but not https://) URLs on the command line instead of files. Note that the whole file is saved to disk, so you still need the disk space. There's no way to resume an interrupted download, and if the whole file is already on disk the download will still start over. If you specify multiple URLs, they'll download in parallel; you will likely hit a server-imposed limit if you try to download more than two files at once.
 
 If you have trouble using dltp with network resources, download the files manually, try again with the local files, and see whether that solves it.
 
