@@ -402,7 +402,11 @@ func (dpr *DPReader) ReadSegment() bool { // writes to self.out
 	if cksum != fileCksum {
 		origCksum := dpchecksum(orig)
 		if origCksum != sourceCksum {
-			panic("checksum mismatch in source--wrong/modified source file?")
+			if sourceCksum == 0 { // no source checksum
+				panic("checksum mismatch in output--mismatched source file, or bug?")
+			} else {
+				panic("checksum mismatch in source--wrong/modified source file?")
+			}
 		} else {
 			panic("checksum mismatch in output")
 		}
