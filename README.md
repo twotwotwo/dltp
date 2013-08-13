@@ -1,11 +1,8 @@
 #dltp
 
-Delta-pack (or expand) an XML dump from MediaWiki, using past dumps as a reference. Or, with -cut and -merge options, just combine dumps or cut info you don't need out of them to get something smaller. Get binaries from 2013-08-12 here:
+Delta-pack (or expand) an XML dump from MediaWiki, using past dumps as a reference. Or, with -cut and -merge options, just combine dumps or cut info you don't need out of them to get something smaller. 
 
-| arch  | linux | mac | windows |
-|-|-|-|-|
-| amd64 | [dltp][1] | [dltp.mac][3] | [dltp.exe][4] |
-| i386  | [dltp386][2] | n/a | [dltp386.exe][5] |
+64-bit binaries from 2013-08-12 are available for [Linux][1], [Mac][3] and [Windows][4]. If you require 32-bit binaries, those are available for [Linux][2] and [Windows][5] as well.
 
 [1]: http://www.rfarmer.net/dltp/bin/dltp
 [2]: http://www.rfarmer.net/dltp/bin/dltp386
