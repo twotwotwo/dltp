@@ -69,13 +69,15 @@ func IsKnown(compression string) bool {
 
 func Open(path string, workingDir *os.File) (s stream.Stream, err error) {
 	reader := stream.Stream(nil)
+	fn := path
 
 	if strings.HasPrefix(path, "http://") {
 		reader, err = httpfile.Open(path, workingDir)
 	} else {
 		// try to open a raw file, then known compressed formats
 		for _, suffix := range suffixes {
-			reader, err = os.Open(path + suffix)
+			fn = path + suffix
+			reader, err = os.Open(fn)
 			if err != nil {
 				if os.IsNotExist(err) {
 					continue
@@ -97,7 +99,7 @@ func Open(path string, workingDir *os.File) (s stream.Stream, err error) {
 		if suffix == "" {
 			continue
 		}
-		if !strings.HasSuffix(path, suffix) {
+		if !strings.HasSuffix(fn, suffix) {
 			continue
 		}
 		compressedReader, err = NewReader(reader, suffix[1:])

@@ -399,17 +399,37 @@ func (dpr *DPReader) ReadSegment() bool { // writes to self.out
 	if err != nil {
 		panic("couldn't read expected checksum")
 	}
+
 	if cksum != fileCksum {
+
 		origCksum := dpchecksum(orig)
-		if origCksum != sourceCksum {
+		panicMsg := ""
+		if origCksum == sourceCksum {
 			if sourceCksum == 0 { // no source checksum
-				panic("checksum mismatch in output--mismatched source file, or bug?")
+				panicMsg = "checksum mismatch. it's possible you don't have the original file this diff was created against, or it could be a bug in dltp."
 			} else {
-				panic("checksum mismatch in source--wrong/modified source file?")
+				panicMsg = "sorry; it looks like source file you have isn't original file this diff was created against."
 			}
 		} else {
-			panic("checksum mismatch in output")
+			panicMsg = "checksum mismatch. this looks likely to be a bug in dltp."
 		}
+
+    os.Remove("dltp-error-report.txt")
+    crashReport, err := os.Create("dltp-error-report.txt")
+    if err == nil {
+      fmt.Fprintln(crashReport, panicMsg)
+      fmt.Fprintln(crashReport, "SourceRef:", source)
+      crashReport.WriteString("Original text:\n\n")
+      crashReport.Write(orig)
+      crashReport.WriteString("\n\nPatched output:\n\n")
+      crashReport.Write(text)
+      crashReport.Close()
+      panicMsg += " wrote additional information to dltp-error-report.txt"
+    } else {
+      panicMsg += " couldn't write additional information (" + err.Error() + ")"
+    }
+    
+    panic(panicMsg)
 	}
 
 	dpr.lastSeg = text
