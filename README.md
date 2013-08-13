@@ -1,14 +1,25 @@
 #dltp
 
-Delta-pack (or expand) an XML dump from MediaWiki, using past dumps as a reference. 
+Delta-pack (or expand) an XML dump from MediaWiki, using past dumps as a reference. Or, with -cut and -merge options, just combine dumps or cut info you don't need out of them to get something smaller. Get binaries from 2013-08-12 here:
 
-Or, with -cut and -merge options, just combine dumps or cut info you don't need out of them to get something smaller.
+| arch  | linux | mac | windows |
+|-|-|-|-|
+| amd64 | [dltp][1] | [dltp.mac][3] | [dltp.exe][4] |
+| i386  | [dltp386][2] | n/a | [dltp386.exe][5] |
+
+[1]: http://www.rfarmer.net/dltp/bin/dltp
+[2]: http://www.rfarmer.net/dltp/bin/dltp386
+[3]: http://www.rfarmer.net/dltp/bin/dltp.mac
+[4]: http://www.rfarmer.net/dltp/bin/dltp.exe
+[5]: http://www.rfarmer.net/dltp/bin/dltp386.exe
 
 ##Packing and unpacking
 
 > dltp [-c] foo.dltp.bz2
 
 Unpacks a .dltp.bz2 (or .dltp.gz, etc.) file. The old XML dump(s) referenced by the delta need to exist in the same directory. `-c` forces output to stdout.
+
+You may have trouble if the old XML dumps don't exist or are truncated or have otherwise been processed. The error message may or may not make clear that this is the problem, depending on just where things went wrong.
 
 It works to pipe a .dltp file (uncompressed) to stdin; then the program looks for reference file(s) in the current directory and send XML to stdout by default. `-f` redirects that output to a file (which is named automatically) in the current directory.
 
@@ -42,9 +53,14 @@ You may pass `-merge` any of the options `-cut` accepts. Again, using at least `
 
 ##Passing URLs on the command line
 
-If you're feeling daring, you can pass http:// (but not https://) URLs on the command line instead of files. Note that the whole file is downloaded (so you still need the space) and there's no way to resume an interrupted download. Finally, all downloads in parallel, and downloading more than a couple files at once on a single command line will often be blocked by the server.
+If you're feeling daring, try something experimental and pass http:// (but not https://) URLs on the command line instead of files. Note that the whole file is saved to disk (so you still need the disk space) and there's no way to resume an interrupted download. If you specify multiple URLs, they'll download parallel; you might hit a server-imposed limit if you try to download more than two files at once.
 
-##Caveats
-This is not stable, heavily tested software. It has no warranty, and breaking changes to the format will happen.  I'd love to know if you're interested in using or working on it, though.
+If you have trouble using dltp with network resources, download the files manually, try again with the local files, and see whether that solves it.
+
+##Debugging and caveats
+
+Running with `-debug` will make the program print more detail after a fatal error, which includes not only bugs but mundane things like missing files, network trouble, or a keyboard interrupt.
+
+This is not stable, heavily tested software. It has no warranty, and breaking changes to the format will happen.  I'd love to know if you're interested in using or working on it.
 
 Public domain, 2013; no warranty.
