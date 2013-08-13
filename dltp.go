@@ -153,7 +153,7 @@ var ns = 0
 
 func recoverAndPrintError() {
 	if r := recover(); r != nil {
-		fmt.Println("Error: ", r)
+		fmt.Println("Error:", r)
 		os.Exit(255)
 	}
 }
