@@ -40,7 +40,7 @@ Rather than packing or unpacking, cuts down a MediaWiki export by skipping all b
 
 You can also use these flags while packing, if you want. The advantage to cutting down the source in a separate step is that you end up with a raw file you can use as a reference file for future diffs, post online as a standalone download, get an md5sum of, etc.
 
-To save memory, right now you should usually cut adds-changes dumps down with `-lastrev`; otherwise the program holds page's whole history in memory at once, which can be a problem for big, very active pages (e.g., admin noticeboards).
+To save memory, right now you should usually cut adds-changes dumps down with `-lastrev`; otherwise the program holds a page's whole history in memory at once, which can be a problem for big, very active pages (e.g., admin noticeboards).
 
 > dltp -merge file1.xml file2.xml [file3.xml...]
 
