@@ -118,10 +118,10 @@ type DPWriter struct {
 }
 
 type DPReader struct {
-	in      *bufio.Reader
-	out     *bufio.Writer
-	sources []io.ReaderAt
-	lastSeg []byte
+	in         *bufio.Reader
+	out        *bufio.Writer
+	sources    []io.ReaderAt
+	lastSeg    []byte
 	ChangeDump bool
 }
 
@@ -363,10 +363,10 @@ func (dpr *DPReader) ReadSegment() bool { // writes to self.out
 	source := sref.ReadSource(dpr.in)
 	if source == sref.EOFMarker {
 		if dpr.ChangeDump {
-                      _, err := dpr.out.Write(dpr.lastSeg)
-                      if err != nil {
-                              panic("couldn't write expanded file")
-                      }
+			_, err := dpr.out.Write(dpr.lastSeg)
+			if err != nil {
+				panic("couldn't write expanded file")
+			}
 		}
 		return false
 	}
@@ -421,31 +421,31 @@ func (dpr *DPReader) ReadSegment() bool { // writes to self.out
 			panicMsg = "checksum mismatch. this looks likely to be a bug in dltp."
 		}
 
-    os.Remove("dltp-error-report.txt")
-    crashReport, err := os.Create("dltp-error-report.txt")
-    if err == nil {
-      fmt.Fprintln(crashReport, panicMsg)
-      fmt.Fprintln(crashReport, "SourceRef:", source)
-      crashReport.WriteString("Original text:\n\n")
-      crashReport.Write(orig)
-      crashReport.WriteString("\n\nPatched output:\n\n")
-      crashReport.Write(text)
-      crashReport.Close()
-      panicMsg += " wrote additional information to dltp-error-report.txt"
-    } else {
-      panicMsg += " couldn't write additional information (" + err.Error() + ")"
-    }
-    
-    panic(panicMsg)
+		os.Remove("dltp-error-report.txt")
+		crashReport, err := os.Create("dltp-error-report.txt")
+		if err == nil {
+			fmt.Fprintln(crashReport, panicMsg)
+			fmt.Fprintln(crashReport, "SourceRef:", source)
+			crashReport.WriteString("Original text:\n\n")
+			crashReport.Write(orig)
+			crashReport.WriteString("\n\nPatched output:\n\n")
+			crashReport.Write(text)
+			crashReport.Close()
+			panicMsg += " wrote additional information to dltp-error-report.txt"
+		} else {
+			panicMsg += " couldn't write additional information (" + err.Error() + ")"
+		}
+
+		panic(panicMsg)
 	}
 
 	// write if not ChangeDump or if changed or if this is preamble
 	if !dpr.ChangeDump || !bytes.Equal(text, orig) || dpr.lastSeg == nil {
-          _, err := dpr.out.Write(text)
-          if err != nil {
-                  panic("couldn't write expanded file")
-  	  }
-  	}
+		_, err := dpr.out.Write(text)
+		if err != nil {
+			panic("couldn't write expanded file")
+		}
+	}
 
 	dpr.lastSeg = text
 

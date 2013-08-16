@@ -172,9 +172,9 @@ func main() {
 	if *debug {
 		c := make(chan os.Signal)
 		signal.Notify(c, os.Interrupt)
-		go func(){
-		    <-c
-		    panic("interrupt")
+		go func() {
+			<-c
+			panic("interrupt")
 		}()
 	} else {
 		defer recoverAndPrintError()
