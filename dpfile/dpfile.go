@@ -122,6 +122,7 @@ type DPReader struct {
 	out     *bufio.Writer
 	sources []io.ReaderAt
 	lastSeg []byte
+	ChangeDump bool
 }
 
 var MaxSourceLength = uint64(1e8)
@@ -361,6 +362,12 @@ var readBuf []byte // not parallel-safe, but reading isn't threaded
 func (dpr *DPReader) ReadSegment() bool { // writes to self.out
 	source := sref.ReadSource(dpr.in)
 	if source == sref.EOFMarker {
+		if dpr.ChangeDump {
+                      _, err := dpr.out.Write(dpr.lastSeg)
+                      if err != nil {
+                              panic("couldn't write expanded file")
+                      }
+		}
 		return false
 	}
 	if source.Length > MaxSourceLength {
@@ -432,11 +439,15 @@ func (dpr *DPReader) ReadSegment() bool { // writes to self.out
     panic(panicMsg)
 	}
 
+	// write if not ChangeDump or if changed or if this is preamble
+	if !dpr.ChangeDump || !bytes.Equal(text, orig) || dpr.lastSeg == nil {
+          _, err := dpr.out.Write(text)
+          if err != nil {
+                  panic("couldn't write expanded file")
+  	  }
+  	}
+
 	dpr.lastSeg = text
-	_, err = dpr.out.Write(text)
-	if err != nil {
-		panic("couldn't write expanded file")
-	}
 
 	return true
 }

@@ -66,6 +66,7 @@ func ReadDiffPack(dp io.Reader, workingDir *os.File, streaming bool) {
 		streaming = true
 	}
 	r := dpfile.NewReader(dp, workingDir, streaming)
+	r.ChangeDump = *changeDump
 	// readsegment while we can
 	for r.ReadSegment() {
 	}
@@ -147,6 +148,7 @@ var cut = flag.Bool("cut", false, "just output a cut down stdin (don't pack)")
 var merge = flag.Bool("merge", false, "merge files listed on command line (newest first) to stdout")
 var debug = flag.Bool("debug", false, "on error, show ugly but useful debug info")
 var compression = flag.String("zip", "auto", "set output compression (bz2, gz, lzo, none)")
+var changeDump = flag.Bool("changedump", false, "unpack only changed pages + dump preamble/close tag")
 
 var limitToNS = false
 var ns = 0
@@ -179,7 +181,7 @@ func main() {
 	}
 
 	if *merge {
-		if *useStdout || *useFile {
+		if *useStdout || *useFile || *changeDump {
 			quitWith("only -lastrev, -ns, and -cutmeta work with -merge")
 		}
 		if *nsString != "" {
@@ -191,7 +193,7 @@ func main() {
 			}
 		}
 	} else if *cut {
-		if *useStdout || *useFile {
+		if *useStdout || *useFile || *changeDump {
 			quitWith("only -lastrev, -ns, and -cutmeta work with -cut")
 		}
 		if *merge {
@@ -223,6 +225,9 @@ func main() {
 			} else {
 				*compression = "gz"
 			}
+		}
+		if *changeDump {
+			quitWith("-changes only available when unpacking")
 		}
 		if *compression == "none" {
 			*compression = ""
