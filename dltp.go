@@ -233,10 +233,10 @@ func main() {
 			*compression = ""
 		}
 		*compression = zip.CanonicalFormatName(*compression)
-		if !zip.IsKnown(*compression) {
+		if *compression != "" && !zip.IsKnown(*compression) {
 			quitWith("unknown compression type '" + *compression + "'")
 		}
-		if !zip.CanWrite(*compression) {
+		if *compression != "" && !zip.CanWrite(*compression) {
 			quitWith("can't find (un)packer for ." + *compression)
 		}
 		if *useFile {

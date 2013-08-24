@@ -136,8 +136,10 @@ func (c *CmdPipe) Close() error {
 	return c.cmd.Wait()
 }
 
-func findZipper(format string) string {
-	cmdPath := ""
+func findZipper(format string) (cmdPath string) {
+	if format == "" {
+		return
+	}
 
 	choicesStr := programs[format]
 	if choicesStr == "" {
@@ -148,11 +150,11 @@ func findZipper(format string) string {
 	for _, cmd := range choices {
 		cmdPath, _ = exec.LookPath(cmd)
 		if cmdPath != "" {
-			break
+			return
 		}
 	}
 
-	return cmdPath
+	return
 }
 
 func CanWrite(format string) bool {
