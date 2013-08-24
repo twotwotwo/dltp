@@ -227,7 +227,7 @@ func main() {
 			}
 		}
 		if *changeDump {
-			quitWith("-changes only available when unpacking")
+			quitWith("-changedump only available when unpacking")
 		}
 		if *compression == "none" {
 			*compression = ""
