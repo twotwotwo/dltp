@@ -2,7 +2,7 @@
 
 Delta-pack (or expand) an XML dump from MediaWiki, using past dumps as a reference. Or, when run with different options, just combine dumps or cut info you don't need out of them to get something smaller. 
 
-64-bit binaries from 2013-08-12 are available for [Linux][1], [Mac][3] and [Windows][4]. If you require 32-bit binaries, those are available for [Linux][2] and [Windows][5] as well.
+64-bit binaries from 2013-08-16 are available for [Linux][1], [Mac][3] and [Windows][4]. If you require 32-bit binaries, those are available for [Linux][2] and [Windows][5] as well.
 
 [1]: http://www.rfarmer.net/dltp/bin/dltp
 [2]: http://www.rfarmer.net/dltp/bin/dltp386
@@ -12,13 +12,15 @@ Delta-pack (or expand) an XML dump from MediaWiki, using past dumps as a referen
 
 ##Packing and unpacking
 
-> dltp [-c] foo.dltp.bz2
+> dltp [-c] [-changedump] foo.dltp.bz2
 
 Unpacks foo.dltp.bz2. The old XML dump(s) referenced by the delta need to exist in the same directory. `-c` forces output to stdout.
 
 You'll have trouble if the old XML dumps don't exist, are truncated, or are otherwise not a byte-for-byte match with the reference file used when making the dump. The error message when this happens might be helpful or not, depending on just where things went wrong.
 
 You can pipe a .dltp file (uncompressed) to stdin; then the program looks for reference file(s) in the current directory and sends XML to stdout by default. `-f` redirects that output to a file, assigned a name automatically, in the current directory.
+
+Passing `-changedump` makes the unpacker skip pages with no differences from the original.
 
 > dltp new.xml reference1.xml [reference2.xml...]
 
