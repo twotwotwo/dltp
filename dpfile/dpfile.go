@@ -257,6 +257,9 @@ func (dpw *DPWriter) Close() {
 	if dpw.zOut != nil {
 		dpw.zOut.Close()
 	}
+	for _, sr := range dpw.sources {
+		sr.Close()
+	}
 	//fmt.Println("Packed successfully")
 }
 
@@ -424,6 +427,7 @@ func (dpr *DPReader) ReadSegment() bool { // writes to self.out
 		os.Remove("dltp-error-report.txt")
 		crashReport, err := os.Create("dltp-error-report.txt")
 		if err == nil {
+			// wish filenames etc were available here
 			fmt.Fprintln(crashReport, panicMsg)
 			fmt.Fprintln(crashReport, "SourceRef:", source)
 			crashReport.WriteString("Original text:\n\n")
@@ -453,5 +457,10 @@ func (dpr *DPReader) ReadSegment() bool { // writes to self.out
 }
 
 func (dpr *DPReader) Close() {
+	for _, r := range dpr.sources {
+		if c, ok := r.(io.Closer); ok {
+			c.Close()
+		}
+	}
 	dpr.out.Flush()
 }

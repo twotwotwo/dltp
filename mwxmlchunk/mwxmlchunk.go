@@ -185,6 +185,10 @@ func cutBetween(in []byte, start []byte, end []byte) []byte {
 	return in
 }
 
+func (s *SegmentReader) Close() error {
+	return s.in.Close()
+}
+
 var commentTag = []byte("      <comment>")
 var commentCloseTag = []byte("</comment>\n")
 var contributorTag = []byte("      <contributor>")

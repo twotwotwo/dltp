@@ -8,6 +8,7 @@ import (
 	"github.com/twotwotwo/dltp/httpfile" // who doznt like it.
 	"github.com/twotwotwo/dltp/stream"   // allow skipping fwd through streams
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings" // filename fun
@@ -191,7 +192,23 @@ func (e UnsupportedFormat) Error() string {
 	return "unsupported format " + e.format
 }
 
-func NewReader(in io.Reader, format string) (r io.Reader, err error) {
+// act as an io.Reader but make Close() copy the rest of the content to a blackhole,
+// to avoid a "broken pipe" error from the process we're streaming from (we don't want
+// to hide all errors from the user, but this one's useless)
+type FinishingReader struct {
+	io.Reader
+}
+
+func NewFinishingReader(in io.Reader) (fr *FinishingReader) {
+	return &FinishingReader{in}
+}
+
+func (fr *FinishingReader) Close() error {
+	_, err := io.Copy(ioutil.Discard, fr.Reader)
+	return err
+}
+
+func NewReader(in io.Reader, format string) (rc io.Reader, err error) {
 	cmdPath := findZipper(format)
 	if cmdPath == "" {
 		if format == "gz" {
@@ -210,5 +227,5 @@ func NewReader(in io.Reader, format string) (r io.Reader, err error) {
 		panic(err)
 	}
 	cmd.Start()
-	return reader, nil
+	return NewFinishingReader(reader), nil
 }

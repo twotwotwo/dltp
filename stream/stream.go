@@ -20,6 +20,7 @@ from compressed source files
 type Stream interface {
 	io.Reader
 	io.ReaderAt
+	io.Closer
 }
 
 type StreamReaderAt struct {
@@ -80,4 +81,11 @@ func (sra *StreamReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
 		n += nThisRead
 	}
 	return n, err
+}
+
+func (sra *StreamReaderAt) Close() error {
+	if c, ok := sra.r.(io.Closer); ok {
+		return c.Close()
+	}
+	return nil
 }

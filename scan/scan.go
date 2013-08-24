@@ -273,3 +273,10 @@ func NewScanner(r io.Reader, cap int) (s *Scanner) {
 func (s *Scanner) Content() []byte {
 	return s.All[:s.unreadOffs-s.Offs] // then caller should usually Discard
 }
+
+func (s *Scanner) Close() error {
+	if c, ok := s.in.(io.Closer); ok {
+		return c.Close()
+	}
+	return nil
+}
