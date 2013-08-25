@@ -30,44 +30,58 @@ DiffPack files are gzipped, with a text preamble then binary data.
 
 The text preamble has the following lines (each ending \n):
 
-  - The format name (right now the literal string "DiffPack (test)")
+  - The format name (right now the literal string "DeltaPacker")
   - the source URL (now a placeholder)
-  - the format URL (now a placeholder)
+  - the format URL (now a placeholder; if it's updated, we'll print out this URL
+    as part of the error message)
   - a blank line
-  - a list of files, starting with the output file
+  - a list of files, starting with the output file (only "safe" chars allowed; see
+    safeFilenameStr regexp below)
   - a blank line
 
-Then they're followed by binary diffs each headed with a source reference, which
-consists of three varints (written/read by SourceRef.Write and ReadSource):
+They're followed by binary diffs each headed with a source reference, which consists
+of three varints (written/read by SourceRef.Write and ReadSource):
 
   source file number (signed; -1 means no source)
   start offset (unsigned)
   source length (unsigned)
 
-then the binary diff, which ends with a 0 instruction (see diff.Patch),
-then the 32-bit FNV-1a (the only fixed-size int in the format), then the
-uncompressed length as an unsigned varint.
+then the 32-bit FNV-1a checksum of the source material (checksums are the only
+fixed-size ints in the diff format), then the binary diff, which ends with a 0
+instruction (see diff.Patch), then the output checksum.
 
 A source info header with ID, offset, and length all 0 marks the end of the
-file.
+diffs.
 
-The methods here are:
+You can see dltp.go for invocation with all the bells and whistles, but use of these
+classes goes roughly like:
 
-NewWriter(out, sources)         // write magic and filenames (incl input)
-dpw.WriteSegment()              // write source number, start, end, diff, cksum
-dpw.Close()                     // write end marker
+dpw := dpfile.NewWriter(out, workingDir, sources, [options])
+for dpw.WriteSegment() {} // turn XML into diffs until you run out
+dpw.Close() // write end marker and any etc., flush output
 
-NewReader(in, sources)          // open (including opening output)
-dpr.ReadSegment()               // expand and write a page
-dpr.Close()                     // flush outfile
+dpr := dpfile.NewReader(in, workingDir, streaming) // streaming=true readinf from stdin
+for dpr.ReadSegment {} // turn diffs into XML as long as you can
+dpr.Close() // wrap up
 
-The implementation does some gymnastics to package DiffTasks to run in the
-background and have their output written later. It's not perfect, but seems to
-help.
+The writer implementation does some paperwork to run multiple DiffTasks at once.
 
-There are also vestiges of support for diffing successive revs of a page
+There are some vestiges of support for diffing successive revs of a page
 against each other (e.g., in an incremental file). This would be nice to revive
 but isn't that close now.
+
+Some potential format changes, some breaking, some not:
+
+  - append an "index" after the end marker mapping either SegmentKeys or byte ranges
+    to where their diffs start in the file (non-breaking)
+  - replace the placeholder source URL with the URL of a "manifest" file listing
+    everything available from the source
+  - replace the source names with URLs, and add (likely tab-separated) other data like
+    size/timestamp/crypto and non-crypto checksums
+	- any crypto checksum might be a tweaked mode we can run in parallel, e.g., break
+	  input into 64kb pages then hash the hashes
+	- breaking, but could edit format now to make it a TSV table so it'd be sort of
+	  nonbreaking
 
 */
 
@@ -106,12 +120,20 @@ type DiffTask struct {
 	done      chan int
 }
 
+type DPBlock struct {
+	Key  mwxmlchunk.SegmentKey
+	Offs int64
+}
+
+type DPBlocks []DPBlock
+
 type DPWriter struct {
 	out     *bufio.Writer
 	zOut    io.WriteCloser
 	sources []*mwxmlchunk.SegmentReader
 	lastSeg []byte
 	tasks   []DiffTask
+	blocks  DPBlocks
 	taskCh  chan *DiffTask
 	slots   int
 	winner  int
