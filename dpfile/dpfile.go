@@ -184,7 +184,6 @@ func NewWriter(zOut io.WriteCloser, workingDir *os.File, sourceNames []string, l
 	}
 	dpw.out.Flush()
 
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	dpw.slots = 100 // really a queue len, not thread count
 	dpw.taskCh = make(chan *DiffTask, dpw.slots)
 	for workerNum := 0; workerNum < runtime.NumCPU(); workerNum++ {
