@@ -62,4 +62,4 @@ Running with `-debug` will make the program print more detail on an unsuccessful
 
 This is not stable, heavily tested software. It has no warranty, and breaking changes to the format will happen.  I'd love to know if you're interested in using or working on it.
 
-Public domain, 2013; no warranty.
+The bz2blocks/ directory contains code forked from Go's compress/bzip2 package and is governed by the BSD-style license at http://golang.org/LICENSE. The rest is public domain, 2013; no warranty.

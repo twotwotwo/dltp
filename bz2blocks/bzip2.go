@@ -1,6 +1,6 @@
 // Copyright 2011 The Go Authors; changes for dltp by Randall Farmer, 2013.
 // All rights reserved.  Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
+// license that can be found in Go's LICENSE file at http://golang.org/LICENSE
 
 // Package bz2blocks implements bzip2 decompression, with (optional)
 // parallel decompression and indexing to allow random access with ReadAt.
