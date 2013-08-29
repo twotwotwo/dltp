@@ -3,8 +3,8 @@
 package zip
 
 import (
-	"compress/bzip2"                     // ditto but uncompress only
-	"compress/gzip"                      // fallback f/no pipeable gzip present (e.g., Windows)
+	"compress/gzip" // fallback f/no pipeable gzip present (e.g., Windows)
+	bzip2 "github.com/twotwotwo/dltp/bz2blocks"
 	"github.com/twotwotwo/dltp/httpfile" // who doznt like it.
 	"github.com/twotwotwo/dltp/stream"   // allow skipping fwd through streams
 	"io"
@@ -216,6 +216,9 @@ func NewReader(in io.Reader, format string) (rc io.Reader, err error) {
 		if format == "gz" {
 			return gzip.NewReader(in)
 		} else if format == "bz2" {
+			if ra, ok := in.(io.ReaderAt); ok {
+				return bzip2.NewParallelReader(ra), nil
+			}
 			return bzip2.NewReader(in), nil
 		} else {
 			return nil, UnsupportedFormat{format}

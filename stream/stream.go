@@ -83,6 +83,7 @@ func (sra *StreamReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
 	return n, err
 }
 
+// Closes the underlying reader, if it's also a ReadCloser.
 func (sra *StreamReaderAt) Close() error {
 	if c, ok := sra.r.(io.Closer); ok {
 		return c.Close()

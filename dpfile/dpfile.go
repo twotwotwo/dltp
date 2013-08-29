@@ -24,9 +24,10 @@ import (
 
 /*
 
-DIFFPACK FILE FORMAT
+DELTAPACKER FILE FORMAT
 
-DiffPack files are gzipped, with a text preamble then binary data.
+DeltaPacker files have a text preamble then binary data. Though the dltp program also
+(de)compresses dltp files using bzip2, gzip, etc., that's out of scope here.
 
 The text preamble has the following lines (each ending \n):
 
