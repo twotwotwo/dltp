@@ -2,7 +2,7 @@
 
 Delta-pack (or expand) an XML dump from MediaWiki, using past dumps as a reference. Or, when run with different options, just combine dumps or cut info you don't need out of them to get something smaller. 
 
-64-bit binaries from 2013-08-16 are available for [Linux][1], [Mac][3] and [Windows][4]. If you require 32-bit binaries, those are available for [Linux][2] and [Windows][5] as well.
+64-bit binaries from 2013-08-29 are available for [Linux][1], [Mac][3] and [Windows][4]. If you require 32-bit binaries, those are available for [Linux][2] and [Windows][5] as well.
 
 [1]: http://www.rfarmer.net/dltp/bin/dltp
 [2]: http://www.rfarmer.net/dltp/bin/dltp386
